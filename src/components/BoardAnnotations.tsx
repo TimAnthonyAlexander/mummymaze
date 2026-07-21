@@ -26,9 +26,15 @@ interface Props {
   height: number;
   /** Resets annotations when it changes. */
   levelId: string;
+  /**
+   * For a tile occupied by a living mummy, its deterministic step path this turn
+   * (`[start, ...intermediate, destination]`); null for any other tile. Used to
+   * bend an arrow along the mummy's double-step when it targets that destination.
+   */
+  enemyPath?: (from: Pos) => Pos[] | null;
 }
 
-export function BoardAnnotations({ cell, width, height, levelId }: Props) {
+export function BoardAnnotations({ cell, width, height, levelId, enemyPath }: Props) {
   const [arrows, setArrows] = useState<Arrow[]>([]);
   const [highlights, setHighlights] = useState<Pos[]>([]);
   const [drag, setDrag] = useState<Arrow | null>(null);
@@ -42,6 +48,25 @@ export function BoardAnnotations({ cell, width, height, levelId }: Props) {
 
   const w = cell * width;
   const h = cell * height;
+
+  /**
+   * Resolve an arrow to the tile points it should be drawn through. If it starts
+   * on a mummy AND its target is exactly that mummy's 2-step destination, follow
+   * the mummy's real path (bent). Otherwise a plain start->target straight arrow.
+   */
+  const resolveArrow = (a: Arrow): { points: Pos[]; enemy: boolean } => {
+    const path = enemyPath?.(a.from) ?? null;
+    if (
+      path &&
+      path.length >= 2 &&
+      !samePos(a.from, a.to) &&
+      samePos(a.to, path[path.length - 1])
+    ) {
+      return { points: path, enemy: true };
+    }
+    return { points: [a.from, a.to], enemy: false };
+  };
+  const dragArrow = drag && !samePos(drag.from, drag.to) ? resolveArrow(drag) : null;
 
   const tileAt = (e: ReactPointerEvent): Pos | null => {
     const rect = svgRef.current?.getBoundingClientRect();
@@ -109,14 +134,24 @@ export function BoardAnnotations({ cell, width, height, levelId }: Props) {
       {highlights.map((p) => (
         <HighlightShape key={`hl-${p.x}-${p.y}`} pos={p} cell={cell} />
       ))}
-      {arrows.map((a) => (
-        <ArrowShape key={`ar-${a.from.x}-${a.from.y}-${a.to.x}-${a.to.y}`} arrow={a} cell={cell} />
-      ))}
+      {arrows.map((a) => {
+        const r = resolveArrow(a);
+        return (
+          <ArrowShape
+            key={`ar-${a.from.x}-${a.from.y}-${a.to.x}-${a.to.y}`}
+            points={r.points}
+            enemy={r.enemy}
+            cell={cell}
+          />
+        );
+      })}
       {drag &&
         (samePos(drag.from, drag.to) ? (
           <HighlightShape pos={drag.to} cell={cell} preview />
         ) : (
-          <ArrowShape arrow={drag} cell={cell} preview />
+          dragArrow && (
+            <ArrowShape points={dragArrow.points} enemy={dragArrow.enemy} cell={cell} preview />
+          )
         ))}
     </svg>
   );
@@ -138,11 +173,28 @@ function HighlightShape({ pos, cell, preview }: { pos: Pos; cell: number; previe
   );
 }
 
-function ArrowShape({ arrow, cell, preview }: { arrow: Arrow; cell: number; preview?: boolean }) {
-  const s = { x: (arrow.from.x + 0.5) * cell, y: (arrow.from.y + 0.5) * cell };
-  const e = { x: (arrow.to.x + 0.5) * cell, y: (arrow.to.y + 0.5) * cell };
-  const dx = e.x - s.x;
-  const dy = e.y - s.y;
+/**
+ * Draw an arrow through a polyline of tile points (2 = straight, 3 = one elbow
+ * for a mummy double-step). Head only on the final segment; when `enemy`, the
+ * intermediate step tiles get a small node so the two hops are unmistakable.
+ */
+function ArrowShape({
+  points,
+  cell,
+  enemy,
+  preview,
+}: {
+  points: Pos[];
+  cell: number;
+  enemy?: boolean;
+  preview?: boolean;
+}) {
+  const c = points.map((p) => ({ x: (p.x + 0.5) * cell, y: (p.y + 0.5) * cell }));
+  const n = c.length;
+  const last = c[n - 1];
+  const prev = c[n - 2];
+  const dx = last.x - prev.x;
+  const dy = last.y - prev.y;
   const len = Math.hypot(dx, dy) || 1;
   const ux = dx / len;
   const uy = dy / len;
@@ -150,20 +202,38 @@ function ArrowShape({ arrow, cell, preview }: { arrow: Arrow; cell: number; prev
   const head = cell * 0.36;
   const headW = cell * 0.25;
   const shaft = cell * 0.15;
-  // Start a little out of the origin tile's centre; stop the shaft where the head begins.
-  const sx = s.x + ux * cell * 0.14;
-  const sy = s.y + uy * cell * 0.14;
-  const bx = e.x - ux * head;
-  const by = e.y - uy * head;
-  // Perpendicular for the arrowhead base.
+  const bx = last.x - ux * head;
+  const by = last.y - uy * head;
+
+  // Shaft polyline: start a little out of the first tile centre, run through any
+  // intermediate step tiles, and stop where the arrowhead begins.
+  const first = c[0];
+  const second = c[1];
+  const fdx = second.x - first.x;
+  const fdy = second.y - first.y;
+  const flen = Math.hypot(fdx, fdy) || 1;
+  const start = { x: first.x + (fdx / flen) * cell * 0.14, y: first.y + (fdy / flen) * cell * 0.14 };
+  const shaftPts = [start, ...c.slice(1, n - 1), { x: bx, y: by }];
+  const polyline = shaftPts.map((p) => `${p.x},${p.y}`).join(' ');
+
   const px = -uy;
   const py = ux;
-  const points = `${e.x},${e.y} ${bx + px * headW},${by + py * headW} ${bx - px * headW},${by - py * headW}`;
+  const headPts = `${last.x},${last.y} ${bx + px * headW},${by + py * headW} ${bx - px * headW},${by - py * headW}`;
 
   return (
     <g className="annot-arrow" opacity={preview ? 0.6 : 0.92}>
-      <line x1={sx} y1={sy} x2={bx} y2={by} strokeWidth={shaft} strokeLinecap="round" />
-      <polygon points={points} />
+      <polyline
+        points={polyline}
+        fill="none"
+        strokeWidth={shaft}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <polygon points={headPts} />
+      {enemy &&
+        c.slice(1, n - 1).map((p, i) => (
+          <circle key={i} className="annot-step" cx={p.x} cy={p.y} r={cell * 0.09} />
+        ))}
     </g>
   );
 }

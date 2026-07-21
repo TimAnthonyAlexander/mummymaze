@@ -1,6 +1,6 @@
 import { Key, Skull } from 'lucide-react';
 import type { CSSProperties } from 'react';
-import type { Dir, Level, Pos } from '../engine';
+import { type Dir, type Level, type Pos, monsterStep, samePos } from '../engine';
 import { isLit } from '../game/flashlight';
 import type { RenderState } from '../game/render';
 import { BoardAnnotations } from './BoardAnnotations';
@@ -201,6 +201,21 @@ export function Board({ level, render, cellSize }: BoardProps) {
   const vSet = new Set<string>();
   for (const s of walls) (s.orient === 'h' ? hSet : vSet).add(segKey(s.x, s.y));
 
+  // For the planning arrows: given a tile, if a living MUMMY sits there, return
+  // its deterministic step path THIS turn (start -> intermediate -> destination),
+  // computed against the current player position with the real pursuit rules
+  // (red steps vertical-first). Only mummies double-step; scorpions/others => null.
+  const mummyPathFrom = (from: Pos): Pos[] | null => {
+    const m = render.monsters.find((mm) => mm.alive && samePos(mm.pos, from));
+    if (!m || !m.kind.startsWith('mummy')) return null;
+    const s1 = monsterStep(level, render.gatesOpen, m.kind, m.pos, render.player);
+    const s2 = monsterStep(level, render.gatesOpen, m.kind, s1, render.player);
+    const path: Pos[] = [m.pos];
+    if (!samePos(s1, path[path.length - 1])) path.push(s1);
+    if (!samePos(s2, path[path.length - 1])) path.push(s2);
+    return path;
+  };
+
   return (
     <div className="board" style={boardStyle}>
       <div className="board__grid">
@@ -324,8 +339,17 @@ export function Board({ level, render, cellSize }: BoardProps) {
           </span>
         </div>
 
-        {/* Chess.com-style planning arrows (right-click-drag). UI only. */}
-        <BoardAnnotations cell={cell} width={level.width} height={level.height} levelId={level.id} />
+        {/* Chess.com-style planning arrows (right-click-drag). UI only. When an
+            arrow starts on a MUMMY and ends on where that mummy's deterministic
+            2-step turn lands, the arrow bends through the intermediate tile so
+            the double-step (esp. red = vertical-first) is visible. */}
+        <BoardAnnotations
+          cell={cell}
+          width={level.width}
+          height={level.height}
+          levelId={level.id}
+          enemyPath={mummyPathFrom}
+        />
       </div>
     </div>
   );
