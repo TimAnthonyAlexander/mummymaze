@@ -2,10 +2,17 @@
   /* --cell is supplied at runtime via inline style (dynamic sizing). */
   --cell: 56px;
   --wall: #b08320;
+  --wall-top: #c8a233; /* lit top face (light from top-left) */
+  --wall-side: #7c5c15; /* front/side face in shadow */
   --floor-a: #f3e7c4;
   --floor-b: #ecdfb6;
-  --grid-line: rgba(120, 90, 20, 0.18);
+  --grid-line: rgba(120, 90, 20, 0.12);
+  --wall-lift: 6px;
+  --sprite-lift: 5px;
   position: relative;
+  /* Contain the walls'/sprites' z-index so they never paint over sibling
+     overlays (e.g. the end-of-level panel) drawn on top of the board. */
+  isolation: isolate;
   display: inline-block;
   padding: 6px;
   background: #6b4f1d;
@@ -23,8 +30,7 @@
   grid-template-columns: repeat(var(--cols), var(--cell));
   grid-template-rows: repeat(var(--rows), var(--cell));
   gap: 0;
-  border: 3px solid var(--wall);
-  background: var(--wall);
+  background: var(--floor-b);
 }
 
 .cell {
@@ -48,7 +54,8 @@
   opacity: 0.85;
 }
 
-/* Overlay layer for sprites, exit and gates so they can animate above cells. */
+/* Overlay layer for walls, sprites, exit and gates so they can animate above
+   the floor cells. */
 .board__overlay {
   position: absolute;
   top: 6px;
@@ -56,28 +63,78 @@
   pointer-events: none;
 }
 
+/* Extruded walls are drawn in two planes (see Board.tsx). The shadow plane is a
+   transparent box that only casts the stacked down-right extrusion (front/side
+   faces + a soft floor shadow); the top plane is the solid lit face that sits
+   above every shadow so connected slabs merge into one continuous surface. */
+.wall-shadow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: transparent;
+  border-radius: 2px;
+  box-shadow: var(--wall-extrude);
+  z-index: 1;
+}
+.wall-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: var(--wall-top);
+  /* No radius and no rim: adjacent top faces must butt together seamlessly so a
+     connected run reads as one continuous surface. Any border or rounding here
+     re-draws the internal seams as a visible gleam. */
+  z-index: 2;
+}
+
 .exit-opening {
   position: absolute;
   top: 0;
   left: 0;
+  z-index: 4;
 }
 
 .sprite {
   position: absolute;
   width: var(--cell);
   height: var(--cell);
-  display: grid;
-  place-items: center;
   transition: transform 120ms linear, opacity 200ms ease-out;
   will-change: transform, opacity;
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+}
+
+/* Cast shadow pooled on the tile, nudged down-right to match the light. */
+.sprite__shadow {
+  position: absolute;
+  left: 50%;
+  top: 70%;
+  width: 60%;
+  height: 20%;
+  transform: translate(-42%, 0);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(28, 18, 0, 0.42) 0%,
+    rgba(28, 18, 0, 0) 70%
+  );
+  z-index: 0;
+}
+
+/* The figure floats slightly above its shadow so it reads as standing up off
+   the board, with a soft down-right drop shadow of its own. */
+.sprite__body {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform: translateY(calc(var(--sprite-lift) * -1));
+  filter: drop-shadow(2px 3px 1.5px rgba(0, 0, 0, 0.28));
+  z-index: 1;
 }
 
 .sprite--player {
-  z-index: 3;
+  z-index: 7;
 }
 .sprite--monster {
-  z-index: 2;
+  z-index: 6;
 }
 
 .exit-marker {
@@ -89,14 +146,17 @@
   color: #2c7a4b;
 }
 
+/* Gates read as thin raised slabs matching the wall lighting. */
 .gate {
   position: absolute;
-  background: #7a4a1d;
+  background: var(--wall-top);
   border-radius: 2px;
-  z-index: 1;
+  box-shadow: var(--gate-extrude);
+  z-index: 3;
 }
 .gate--open {
-  opacity: 0.25;
+  opacity: 0.2;
+  box-shadow: none;
 }
 .gate--h {
   height: 6px;

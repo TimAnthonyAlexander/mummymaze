@@ -23,7 +23,6 @@ import { loadSave } from './storage';
 
 const HOP_MS = 135; // per single-tile hop
 const KILL_MS = 110; // pause when a monster is destroyed
-const GATE_MS = 60; // brief beat when gates toggle
 const INITIAL_MS = 24; // let the pre-move frame paint before the first hop
 
 interface Frame {
@@ -64,42 +63,81 @@ function setDead(r: RenderState, id: string): RenderState {
   };
 }
 
+/** Mutations + sounds gathered for one simultaneity tick. */
+interface Round {
+  applies: ((r: RenderState) => RenderState)[];
+  sounds: (() => void)[];
+  hasKill: boolean;
+}
+
 function buildFrames(trace: readonly TraceEvent[]): Frame[] {
-  const frames: Frame[] = [];
-  // Throttle monster ticks: only the FIRST sub-step of each monster sounds, so a
-  // 2-step mummy thumps once per turn instead of double-blasting.
-  const monsterSounded = new Set<string>();
+  // Batch the turn into rounds keyed by TraceMove.round so every monster steps
+  // at the same tick (mummies twice, scorpions once) instead of one-after-
+  // another. Gate/kill events attach to the round of the move that caused them.
+  // Applying a whole round in a single setRender lets the CSS transition slide
+  // all sprites together. The exit walk-out stays a sequential player-only path.
+  const rounds = new Map<number, Round>();
+  const exits: { path: readonly RenderState['player'][] }[] = [];
+  let lastRound = 0;
+  let monsterSounded = false; // one monster thump per turn
+
+  const bucket = (round: number): Round => {
+    let b = rounds.get(round);
+    if (!b) {
+      b = { applies: [], sounds: [], hasKill: false };
+      rounds.set(round, b);
+    }
+    return b;
+  };
+
   for (const ev of trace) {
     switch (ev.kind) {
       case 'move': {
-        const isPlayer = ev.actor === 'player';
-        let sound: (() => void) | undefined;
-        if (isPlayer) {
-          sound = sfx.step;
-        } else if (!monsterSounded.has(ev.actor)) {
-          monsterSounded.add(ev.actor);
-          sound = sfx.monster;
+        const b = bucket(ev.round);
+        lastRound = ev.round;
+        const { actor, to } = ev;
+        b.applies.push((r) => setActorPos(r, actor, to));
+        if (actor === 'player') {
+          b.sounds.push(sfx.step);
+        } else if (!monsterSounded) {
+          monsterSounded = true;
+          b.sounds.push(sfx.monster);
         }
-        frames.push({ dur: HOP_MS, apply: (r) => setActorPos(r, ev.actor, ev.to), sound });
         break;
       }
-      case 'gate':
-        frames.push({
-          dur: GATE_MS,
-          apply: (r) => ({ ...r, gatesOpen: ev.gatesOpen }),
-          sound: sfx.key,
-        });
+      case 'gate': {
+        const b = bucket(lastRound);
+        const { gatesOpen } = ev;
+        b.applies.push((r) => ({ ...r, gatesOpen }));
+        b.sounds.push(sfx.key);
         break;
-      case 'kill':
-        frames.push({ dur: KILL_MS, apply: (r) => setDead(r, ev.actor), sound: sfx.merge });
+      }
+      case 'kill': {
+        const b = bucket(lastRound);
+        const { actor } = ev;
+        b.applies.push((r) => setDead(r, actor));
+        b.sounds.push(sfx.merge);
+        b.hasKill = true;
         break;
+      }
       case 'exit':
-        for (const p of ev.path) {
-          frames.push({ dur: HOP_MS, apply: (r) => ({ ...r, player: p }) });
-        }
-        frames.push({ dur: HOP_MS, apply: (r) => ({ ...r, playerOpacity: 0 }) });
+        exits.push({ path: ev.path });
         break;
     }
+  }
+
+  const frames: Frame[] = [];
+  for (const round of [...rounds.keys()].sort((a, b) => a - b)) {
+    const { applies, sounds, hasKill } = rounds.get(round)!;
+    frames.push({
+      dur: hasKill ? HOP_MS + KILL_MS : HOP_MS,
+      apply: (r) => applies.reduce((acc, fn) => fn(acc), r),
+      sound: sounds.length ? () => sounds.forEach((s) => s()) : undefined,
+    });
+  }
+  for (const ex of exits) {
+    for (const p of ex.path) frames.push({ dur: HOP_MS, apply: (r) => ({ ...r, player: p }) });
+    frames.push({ dur: HOP_MS, apply: (r) => ({ ...r, playerOpacity: 0 }) });
   }
   return frames;
 }

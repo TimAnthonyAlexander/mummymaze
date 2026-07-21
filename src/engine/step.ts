@@ -25,6 +25,13 @@ export interface TraceMove {
   readonly actor: 'player' | string; // 'player' or a monster id
   readonly from: Pos;
   readonly to: Pos;
+  /**
+   * Simultaneity tick for animation. The player's hop is round 0; a monster's
+   * s-th sub-step (0-indexed) is round s+1. The UI batches all hops sharing a
+   * round so every monster steps at the same time (mummies twice, scorpions
+   * once), while the engine still RESOLVES them sequentially for collisions.
+   */
+  readonly round: number;
 }
 /** Gates toggled (by a key) — new open map after the toggle. */
 export interface TraceGate {
@@ -130,7 +137,7 @@ function run(state: GameState, action: Action, trace: TraceEvent[] | null): Game
   const player: Pos =
     effective === 'wait' ? state.player : neighbor(state.player, effective);
   if (trace && effective !== 'wait') {
-    trace.push({ kind: 'move', actor: 'player', from: state.player, to: player });
+    trace.push({ kind: 'move', actor: 'player', from: state.player, to: player, round: 0 });
   }
 
   let gatesOpen = state.gatesOpen;
@@ -167,7 +174,7 @@ function run(state: GameState, action: Action, trace: TraceEvent[] | null): Game
       if (samePos(nextPos, from)) continue; // blocked; step wasted
 
       monsters[i] = { ...monsters[i], pos: nextPos };
-      if (trace) trace.push({ kind: 'move', actor: monsters[i].id, from, to: nextPos });
+      if (trace) trace.push({ kind: 'move', actor: monsters[i].id, from, to: nextPos, round: s + 1 });
 
       // Key toggle.
       if (cellAt(state.level, nextPos).key) {

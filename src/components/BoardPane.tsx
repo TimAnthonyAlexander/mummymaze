@@ -85,6 +85,7 @@ export function BoardPane({
               sx={{
                 position: 'absolute',
                 inset: 0,
+                zIndex: 5,
                 display: 'grid',
                 placeItems: 'center',
                 bgcolor: 'rgba(20,16,10,0.82)',
