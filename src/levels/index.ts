@@ -20,6 +20,14 @@ import lvl_09_lock_key from './09-lock-key.json';
 import lvl_10_ambush from './10-ambush.json';
 import lvl_11_the_warren from './11-the-warren.json';
 import lvl_12_final_trial from './12-final-trial.json';
+import lvl_13_trial_13 from './13-trial-13.json';
+import lvl_14_trial_14 from './14-trial-14.json';
+import lvl_15_trial_15 from './15-trial-15.json';
+import lvl_16_trial_16 from './16-trial-16.json';
+import lvl_17_trial_17 from './17-trial-17.json';
+import lvl_18_trial_18 from './18-trial-18.json';
+import lvl_19_trial_19 from './19-trial-19.json';
+import lvl_20_trial_20 from './20-trial-20.json';
 
 const SPECS: LevelSpec[] = [
   lvl_01_the_chase as LevelSpec,
@@ -34,6 +42,14 @@ const SPECS: LevelSpec[] = [
   lvl_10_ambush as LevelSpec,
   lvl_11_the_warren as LevelSpec,
   lvl_12_final_trial as LevelSpec,
+  lvl_13_trial_13 as LevelSpec,
+  lvl_14_trial_14 as LevelSpec,
+  lvl_15_trial_15 as LevelSpec,
+  lvl_16_trial_16 as LevelSpec,
+  lvl_17_trial_17 as LevelSpec,
+  lvl_18_trial_18 as LevelSpec,
+  lvl_19_trial_19 as LevelSpec,
+  lvl_20_trial_20 as LevelSpec,
 ];
 
 /** Validated, runtime-ready levels in play order. */
