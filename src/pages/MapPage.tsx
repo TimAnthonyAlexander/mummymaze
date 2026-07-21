@@ -41,29 +41,29 @@ function PyramidCard({
   const locked = !progress.unlocked;
   return (
     <Paper
-      elevation={isCurrent ? 6 : 2}
+      elevation={isCurrent ? 6 : 1}
       sx={{
-        p: { xs: 2.5, sm: 3 },
-        flex: '1 1 320px',
-        maxWidth: 460,
-        opacity: locked ? 0.55 : 1,
+        p: { xs: 2, sm: 2.25 },
+        opacity: locked ? 0.5 : 1,
         border: isCurrent ? '2px solid #c99a1e' : '1px solid rgba(201,154,30,0.22)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 2,
+        gap: 1.25,
       }}
     >
-      <Stack sx={{ alignItems: 'center', gap: 0.5, textAlign: 'center' }}>
-        <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1.5 }}>
+      <Stack sx={{ alignItems: 'center', gap: 0.25, textAlign: 'center', width: '100%' }}>
+        <Typography variant="overline" color="text.secondary" sx={{ letterSpacing: 1.5, lineHeight: 1.4 }}>
           Pyramid {index + 1}
         </Typography>
-        <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
-          {locked && <Lock size={18} />}
-          <Typography variant="h5">{pyramid.name}</Typography>
+        <Stack direction="row" sx={{ alignItems: 'center', gap: 0.75, minHeight: 28 }}>
+          {locked && <Lock size={15} />}
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.15 }} noWrap>
+            {pyramid.name}
+          </Typography>
         </Stack>
         <Typography
-          variant="body2"
+          variant="caption"
           sx={{ color: isCurrent ? 'warning.light' : 'text.secondary', fontWeight: 700 }}
         >
           {progress.completedCount} / {progress.total}
@@ -78,7 +78,7 @@ function PyramidCard({
         completed={completed}
         onSelect={onSelect}
         tileSize={tileSize}
-        gap={Math.round(tileSize * 0.2)}
+        gap={Math.max(4, Math.round(tileSize * 0.18))}
       />
     </Paper>
   );
@@ -98,7 +98,7 @@ export function MapPage() {
   const onSelect = useCallback((id: string) => navigate(`/play/${id}`), [navigate]);
 
   const backTo = currentId ?? LEVELS[0].id;
-  const tileSize = isMobile ? 52 : 64;
+  const tileSize = isMobile ? 28 : 34;
 
   return (
     <Box
@@ -112,7 +112,7 @@ export function MapPage() {
         py: { xs: 3, sm: 5 },
       }}
     >
-      <Stack sx={{ maxWidth: 1000, mx: 'auto', gap: { xs: 3, sm: 4 } }}>
+      <Stack sx={{ maxWidth: 1320, mx: 'auto', gap: { xs: 3, sm: 4 } }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           sx={{
@@ -138,14 +138,21 @@ export function MapPage() {
               The Necropolis
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Choose your tomb
+              {PYRAMIDS.length} tombs · choose your descent
             </Typography>
           </Stack>
         </Stack>
 
-        <Stack
-          direction={{ xs: 'column', md: 'row' }}
-          sx={{ gap: { xs: 3, sm: 4 }, alignItems: 'stretch', justifyContent: 'center' }}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: 'repeat(auto-fill, minmax(150px, 1fr))',
+              sm: 'repeat(auto-fill, minmax(210px, 1fr))',
+            },
+            gap: { xs: 1.5, sm: 2.5 },
+            alignItems: 'start',
+          }}
         >
           {PYRAMIDS.map((pyramid, i) => (
             <PyramidCard
@@ -161,7 +168,7 @@ export function MapPage() {
               tileSize={tileSize}
             />
           ))}
-        </Stack>
+        </Box>
       </Stack>
     </Box>
   );

@@ -41,6 +41,20 @@ export interface GenerateOptions {
    * trivial one-step wins on larger boards. Default 0 (no constraint).
    */
   readonly minStartExitDistance?: number;
+  /**
+   * State budget for every solver/difficulty call while generating. A candidate
+   * whose search EXCEEDS this cap is treated as unsolvable and REJECTED, so the
+   * pack only ever contains tractable, fast-to-solve levels. Default: the
+   * solver's own DEFAULT_STATE_CAP (i.e. no extra tightening).
+   */
+  readonly cap?: number;
+  /**
+   * Require the level to be solvable WITHOUT ever merging two monsters
+   * (forbidCollisions). True for early teaching levels (a merge is never the
+   * required path); set false for advanced levels where a merge MAY be part of
+   * the intended solution. Default true (preserves the historical guarantee).
+   */
+  readonly requireForbidSolvable?: boolean;
 }
 
 export interface GeneratedLevel {
@@ -206,6 +220,9 @@ export function generateLevelDetailed(
   const attempts = opts.attempts ?? 400;
   const min = opts.minDifficulty ?? -Infinity;
   const max = opts.maxDifficulty ?? Infinity;
+  const cap = opts.cap;
+  const solveOpts = cap !== undefined ? { cap } : {};
+  const requireForbid = opts.requireForbidSolvable ?? true;
 
   for (let i = 0; i < attempts; i++) {
     const spec = buildSpec(opts, rng);
@@ -218,20 +235,24 @@ export function generateLevelDetailed(
       continue; // invalid geometry; try again
     }
 
-    const result = solve(level);
+    // A search that BLOWS THE CAP returns solvable:false here, so an intractable
+    // candidate (one the solver cannot exhaust within `cap` states) is rejected
+    // exactly like an unsolvable one — keeping every shipped level fast to solve.
+    const result = solve(level, solveOpts);
     if (!result.solvable || result.solution === null) continue;
 
-    // Never-required-merging guarantee: reject any level whose ONLY winning
-    // lines require destroying a monster (a collision/merge). With >= 2 monsters
-    // we re-solve forbidding collisions; the collision mechanic still EXISTS
-    // (players may lure monsters together) but is never the required path. With
-    // 0 or 1 monster a merge is impossible, so the extra solve is skipped.
-    if (level.monstersStart.length >= 2) {
-      const noMerge = solve(level, { forbidCollisions: true });
+    // Never-required-merging guarantee (early levels only): reject any level
+    // whose ONLY winning lines require destroying a monster (a collision/merge).
+    // With >= 2 monsters we re-solve forbidding collisions; the collision
+    // mechanic still EXISTS (players may lure monsters together) but is never
+    // the required path. Advanced levels pass `requireForbidSolvable: false` so
+    // a merge MAY be required. With 0/1 monster a merge is impossible anyway.
+    if (requireForbid && level.monstersStart.length >= 2) {
+      const noMerge = solve(level, { ...solveOpts, forbidCollisions: true });
       if (!noMerge.solvable) continue;
     }
 
-    const difficulty = scoreDifficulty(level);
+    const difficulty = scoreDifficulty(level, cap ?? 200_000);
     if (difficulty.score < min || difficulty.score > max) continue;
 
     const par = result.solution.length;

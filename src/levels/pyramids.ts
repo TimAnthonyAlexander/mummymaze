@@ -1,15 +1,17 @@
 /**
  * Pyramid grouping — a CONFIG layer over the flat `LEVELS` registry.
  *
- * The 20 levels are organised into themed pyramids of 10, each laid out as rows
+ * The levels are organised into themed pyramids of 10, each laid out as rows
  * `[4, 3, 2, 1]` from base to apex (the climb rises with difficulty). This file
  * NEVER edits the level JSON; it only references level ids and provides display
  * overrides + the progression order that unlocking follows.
  *
- * Pyramid 1 ("The Antechamber") = the teaching curriculum, levels 1–10 in the
- * order they were authored. Pyramid 2 ("The Deep Tomb") = levels 11–20, ordered
- * base→apex by rising `par` so the easiest sits at the base and the hardest at
- * the apex.
+ * Pyramid 1 ("The Antechamber") = the teaching curriculum, in the order the
+ * levels were authored. Every later pyramid takes its 10 levels and orders them
+ * base→apex by rising `par`, so the easiest sits at the base and the hardest at
+ * the apex. The current pack ships 170 levels → 17 pyramids of rising
+ * difficulty; the grouping adapts automatically to however many levels the
+ * generator ships (up to the 20 themed names below).
  */
 import { LEVELS, getLevel } from './index';
 
@@ -23,10 +25,40 @@ export interface Pyramid {
 /** How many tiles sit in each row, base→apex. Sums to 10. */
 const ROW_SHAPE = [4, 3, 2, 1] as const;
 
+/** Levels per pyramid. */
+const PYRAMID_SIZE = ROW_SHAPE.reduce((a, b) => a + b, 0);
+
 /**
- * Nicer, theme-consistent display names for the auto-generated "Trial NN"
- * levels. Levels with hand-authored names (1–12) fall through to their JSON
- * name via `displayName`.
+ * Themed names for the pyramids, base tomb → deepest tomb. There are 20 to cover
+ * the full 200-level pack; if fewer levels ship, only the leading names are used.
+ */
+const PYRAMID_NAMES: readonly string[] = [
+  'The Antechamber',
+  'The Deep Tomb',
+  'Hall of Ashes',
+  'The Scarab Crypt',
+  "Serpent's Descent",
+  'The Sunken Vault',
+  'Chamber of Jackals',
+  'The Obsidian Gate',
+  'Valley of Whispers',
+  'The Amber Sepulchre',
+  'Throne of Dust',
+  'The Cobra Sanctum',
+  'Vault of the Vizier',
+  'The Sunless Passage',
+  'Necropolis Depths',
+  'The Onyx Labyrinth',
+  'Tomb of the Forgotten',
+  'The Solar Barque',
+  'Hall of the Two Truths',
+  "The Pharaoh's Rest",
+];
+
+/**
+ * Hand-picked display names for the earliest auto-generated "Trial NN" levels
+ * (13–20). Levels with hand-authored names (1–12) fall through to their JSON
+ * name; generated levels from 21 on get an algorithmic themed name.
  */
 const DISPLAY_OVERRIDES: Readonly<Record<string, string>> = {
   '13-trial-13': "Serpent's Coil",
@@ -38,6 +70,25 @@ const DISPLAY_OVERRIDES: Readonly<Record<string, string>> = {
   '19-trial-19': 'Anubis Gate',
   '20-trial-20': "Pharaoh's Snare",
 };
+
+/** Adjective/noun pools for deterministic themed names of generated levels. */
+const NAME_ADJ: readonly string[] = [
+  'Sunken', 'Shattered', 'Whispering', 'Golden', 'Cursed', 'Hidden', 'Endless',
+  'Forgotten', 'Burning', 'Silent', 'Crimson', 'Shifting', 'Ancient', 'Hollow',
+  'Bygone', 'Veiled', 'Wretched', 'Sacred', 'Dusk', 'Serpent',
+];
+const NAME_NOUN: readonly string[] = [
+  'Passage', 'Vault', 'Corridor', 'Snare', 'Gauntlet', 'Reliquary', 'Warren',
+  'Descent', 'Threshold', 'Catacomb', 'Anteroom', 'Labyrinth', 'Crossing',
+  'Sanctum', 'Hollow', 'Chamber', 'Spiral', 'Gate', 'Rift', 'Maze',
+];
+
+/** A stable, varied themed name for generated "Trial N" levels (N >= 21). */
+function themedName(n: number): string {
+  const adj = NAME_ADJ[n % NAME_ADJ.length];
+  const noun = NAME_NOUN[(n * 7) % NAME_NOUN.length];
+  return `${adj} ${noun}`;
+}
 
 /** Split a flat list of ids into rows following {@link ROW_SHAPE}. */
 function toRows(ids: readonly string[]): string[][] {
@@ -60,20 +111,32 @@ function parOf(id: string): number {
   return getLevel(id)?.par ?? Number.MAX_SAFE_INTEGER;
 }
 
-// Pyramid 1: levels 1–10, authoring order (base 1–4, then 5–7, 8–9, apex 10).
-const PYRAMID_1_IDS = LEVELS.slice(0, 10).map((l) => l.id);
+/**
+ * Build the pyramids by chunking the flat registry into groups of ten. Pyramid 1
+ * keeps its authoring (teaching) order; every later pyramid is ordered base→apex
+ * by rising par (tiebreak: registry order).
+ */
+function buildPyramids(): Pyramid[] {
+  const pyramids: Pyramid[] = [];
+  const count = Math.ceil(LEVELS.length / PYRAMID_SIZE);
+  for (let p = 0; p < count; p++) {
+    const chunk = LEVELS.slice(p * PYRAMID_SIZE, (p + 1) * PYRAMID_SIZE).map((l) => l.id);
+    const ordered =
+      p === 0
+        ? chunk
+        : [...chunk].sort((a, b) => parOf(a) - parOf(b) || registryIndex(a) - registryIndex(b));
+    pyramids.push({
+      id: `pyramid-${p + 1}`,
+      name: PYRAMID_NAMES[p] ?? `Tomb ${p + 1}`,
+      rows: toRows(ordered),
+    });
+  }
+  return pyramids;
+}
 
-// Pyramid 2: levels 11–20 sorted base→apex by rising par (tiebreak: play order).
-const PYRAMID_2_IDS = LEVELS.slice(10, 20)
-  .map((l) => l.id)
-  .sort((a, b) => parOf(a) - parOf(b) || registryIndex(a) - registryIndex(b));
+export const PYRAMIDS: readonly Pyramid[] = buildPyramids();
 
-export const PYRAMIDS: readonly Pyramid[] = [
-  { id: 'pyramid-1', name: 'The Antechamber', rows: toRows(PYRAMID_1_IDS) },
-  { id: 'pyramid-2', name: 'The Deep Tomb', rows: toRows(PYRAMID_2_IDS) },
-];
-
-/** Flat play order: pyramid-1 base→apex, then pyramid-2 base→apex. */
+/** Flat play order: each pyramid base→apex, in pyramid order. */
 export function progressionOrder(): string[] {
   return PYRAMIDS.flatMap((p) => p.rows.flat());
 }
@@ -98,7 +161,10 @@ export function pyramidLevelIds(pyramid: Pyramid): string[] {
 
 /** Display name for a level: a themed override, else the JSON name, else the id. */
 export function displayName(levelId: string): string {
-  return DISPLAY_OVERRIDES[levelId] ?? getLevel(levelId)?.name ?? levelId;
+  if (DISPLAY_OVERRIDES[levelId]) return DISPLAY_OVERRIDES[levelId];
+  const trial = levelId.match(/^\d+-trial-(\d+)$/);
+  if (trial) return themedName(parseInt(trial[1], 10));
+  return getLevel(levelId)?.name ?? levelId;
 }
 
 /** 1-based position of a level within its pyramid (base-left → apex), else 0. */

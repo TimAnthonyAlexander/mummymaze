@@ -263,26 +263,55 @@ function optsFromSlot(slot, id) {
   };
 }
 
-/** Continuation curve for `extend` (index 12, 13, ...): bigger, busier boards. */
-function slotOptionsFor(i, id, name) {
-  const size = Math.min(11, 8 + Math.floor((i - 12) / 2)); // 8x8 -> 11x11
-  const monsterCount = Math.min(4, 2 + Math.floor((i - 12) / 2));
+// ===========================================================================
+// TIER MODEL for the extended pack (pyramids 3..20 = levels 21..200)
+//
+// The pack is organised into 20 difficulty TIERS, one per pyramid of 10 levels.
+// Pyramids 1-2 are the hand-authored + first generated content; pyramids 3..20
+// are grown here. Two design rules the tier model encodes:
+//
+//   * Boards stay SMALL (<= 12). Difficulty rises via MORE walls / traps / keys
+//     / monsters, NEVER via ever-larger boards. Walls in particular raise the
+//     "tension" (forced-move fraction) and par while SHRINKING the reachable
+//     state space — so they make levels harder AND faster to solve.
+//   * Difficulty rises GENTLY. Each tier gets a target difficulty WINDOW that
+//     drifts up per pyramid; inside a pyramid the 10 levels climb base->apex.
+//     The window (never the solvable/beeline/proximity invariants) is what gets
+//     relaxed if a tier is hard to fill, so generation always completes.
+// ===========================================================================
+
+/** Solver/difficulty state budget for generated levels: cap-hits are rejected. */
+const EXTEND_CAP = 250_000;
+/** Difficulty floor for every generated level (keeps them above pyramid 1). */
+const EXTEND_FLOOR = 30;
+
+/**
+ * Tier plan for a 0-based global play index (>= 20 for pyramid 3+). Returns the
+ * board/monster/hazard parameters plus the target difficulty window centre.
+ */
+function tierPlan(idx) {
+  const pyramid = Math.floor(idx / 10) + 1; // 3..20
+  const pos = idx % 10; // 0 (base) .. 9 (apex)
+  const t = pyramid;
+
+  // Boards grow GENTLY and stay capped at 12 (mostly 8..11).
+  const size = Math.min(12, 8 + Math.floor((t - 3) / 3)); // t3:8 .. t12:11 .. t15:12
+
+  // Monsters rise gently, capped at 5.
+  const monsterCount = Math.min(5, 3 + Math.floor((t - 3) / 4)); // t3:3 t7:4 t11:5
   const monsters = [];
   for (let j = 0; j < monsterCount; j++) {
-    monsters.push(KIND_ROTATION[(i + j) % KIND_ROTATION.length]);
+    monsters.push(KIND_ROTATION[(idx + j) % KIND_ROTATION.length]);
   }
-  return {
-    id,
-    name,
-    width: size,
-    height: size,
-    monsters,
-    wallDensity: Math.min(0.14, 0.06 + 0.01 * (i - 12)),
-    traps: Math.min(4, 1 + Math.floor((i - 12) / 2)),
-    key: true,
-    minStartExitDistance: 2,
-    attempts: 60,
-  };
+
+  // Primary difficulty levers: walls + traps + a key/gate (fast, high-tension).
+  const wallDensity = Math.min(0.16, 0.08 + 0.005 * (t - 3) + 0.004 * pos);
+  const traps = Math.min(5, 1 + Math.floor((t - 3) / 3) + Math.floor(pos / 5));
+
+  // Gently rising difficulty window: base drifts +1.1/tier, +~0.67/step inside.
+  const center = 40 + (t - 3) * 1.1 + pos * (6 / 9);
+
+  return { pyramid, pos, size, monsters, wallDensity, traps, center };
 }
 
 function slugify(name) {
@@ -324,10 +353,20 @@ function signature(spec) {
 }
 
 // ---- file helpers ----------------------------------------------------------
+function levelFileNumber(f) {
+  const m = f.match(/^(\d+)-/);
+  return m ? parseInt(m[1], 10) : Number.MAX_SAFE_INTEGER;
+}
+
+/**
+ * Level files in PLAY order. Sorted NUMERICALLY by their leading number — a
+ * plain lexical sort would place "100-" before "18-" once the pack passes 99
+ * levels, scrambling play/pyramid order.
+ */
 function existingLevelFiles() {
   return readdirSync(LEVELS_DIR)
     .filter((f) => /^\d+-.*\.json$/.test(f))
-    .sort();
+    .sort((a, b) => levelFileNumber(a) - levelFileNumber(b) || a.localeCompare(b));
 }
 
 function identifierFor(file) {
@@ -435,6 +474,71 @@ function drawCurriculumRising(eng, gen, baseOpts, index, rng, prevDiff, existing
   return null;
 }
 
+/**
+ * Draw a level for `idx` matching its tier plan. Pulls a POOL of curriculum-
+ * passing candidates (cap-hits already rejected inside generateLevelDetailed),
+ * keeps the one CLOSEST to the tier's target difficulty within a widening band,
+ * and relaxes ONLY the difficulty window (never the invariants) if a tier is
+ * hard to fill. Guaranteed to return a curriculum-passing level (above the
+ * floor) or null only if the board genuinely cannot host one.
+ */
+function drawTierLevel(eng, gen, idx, plan, id, name, rng, existingSignatures) {
+  const opts = {
+    id,
+    name,
+    width: plan.size,
+    height: plan.size,
+    monsters: plan.monsters,
+    wallDensity: plan.wallDensity,
+    traps: plan.traps,
+    key: true,
+    minStartExitDistance: 2,
+    attempts: 90,
+    cap: EXTEND_CAP,
+    // Advanced levels: a merge MAY be required, so do not force forbid-solvable.
+    requireForbidSolvable: false,
+    minDifficulty: -Infinity,
+    maxDifficulty: Infinity,
+  };
+  const POOL = 26;
+  let band = 5;
+  let cur = { ...opts };
+  let fallback = null; // closest curriculum-passing candidate >= floor (any band)
+  let fallbackDelta = Infinity;
+
+  for (let round = 0; round < 9; round++) {
+    let best = null;
+    let bestDelta = Infinity;
+    for (let k = 0; k < POOL; k++) {
+      const cand = gen.generateLevelDetailed(cur, rng);
+      if (!cand) continue;
+      if (existingSignatures.has(signature(cand.spec))) continue;
+      if (gen.curriculumFailures(cand.level, idx, false).length) continue;
+      const s = cand.difficulty.score;
+      if (s < EXTEND_FLOOR) continue;
+      const delta = Math.abs(s - plan.center);
+      if (delta < fallbackDelta) {
+        fallback = cand;
+        fallbackDelta = delta;
+      }
+      if (s >= plan.center - band && s <= plan.center + band && delta < bestDelta) {
+        best = cand;
+        bestDelta = delta;
+      }
+    }
+    if (best) return best;
+    // Relax the WINDOW (widen the band) and make the board a touch busier so a
+    // higher-difficulty candidate becomes reachable. Invariants stay untouched.
+    band += 4;
+    cur = {
+      ...cur,
+      wallDensity: Math.min(0.2, (cur.wallDensity ?? 0) + 0.008),
+      traps: (cur.traps ?? 0) + 1,
+    };
+  }
+  return fallback;
+}
+
 // ---- reporting -------------------------------------------------------------
 function monsterSummary(spec) {
   const kinds = (spec.monsters ?? []).map((m) => m.kind);
@@ -506,6 +610,16 @@ function assertPackInvariants(rows) {
 // ---- main ------------------------------------------------------------------
 async function main() {
   const mode = process.argv[2] ?? 'generate';
+
+  // `reindex` only rewrites src/levels/index.ts from the files already on disk
+  // (numeric play order). Pure fs — no engine/vite needed.
+  if (mode === 'reindex') {
+    rewriteIndex();
+    const files = existingLevelFiles();
+    console.log(`reindexed ${files.length} level(s): ${files[0]} … ${files[files.length - 1]}`);
+    return;
+  }
+
   const server = await createServer({ server: { middlewareMode: true }, logLevel: 'error' });
   try {
     const eng = await server.ssrLoadModule('/src/engine/index.ts');
@@ -582,59 +696,88 @@ async function runExtend(eng, gen, count) {
 
   const existingSignatures = new Set();
   let maxNum = 0;
-  let ceilingDiff = -Infinity;
   for (const f of files) {
     const spec = JSON.parse(readFileSync(join(LEVELS_DIR, f), 'utf8'));
     existingSignatures.add(signature(spec));
     const m = f.match(/^(\d+)-/);
     if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
-    try {
-      const lvl = eng.loadLevel(spec);
-      const d = eng.scoreDifficulty(lvl);
-      if (d.breakdown.solvable) ceilingDiff = Math.max(ceilingDiff, d.score);
-    } catch {
-      /* ignore unscoreable legacy level */
-    }
   }
-  if (!Number.isFinite(ceilingDiff)) ceilingDiff = 0;
 
   const seed = (BASE_SEED ^ Math.imul(files.length, 0x9e3779b1)) >>> 0;
   const rng = mulberry32(seed);
 
+  // Quiet the solver's per-cap-hit warning; cap-hits are EXPECTED and handled
+  // (a capped search is treated as unsolvable and the candidate is rejected).
+  const realWarn = console.warn;
+  console.warn = () => {};
+
   const rows = [];
-  let prevDiff = ceilingDiff;
   let produced = 0;
-  let curveIndex = Math.max(files.length, CURRICULUM.length + GEN_SLOTS.length);
+  const t0 = Date.now();
+  let curPyramid = 0;
+  const perPyramid = new Map(); // pyramid -> { min, max, count }
 
-  while (produced < count) {
-    const levelIndex = maxNum + produced; // 0-based play index of the new level
-    const num = String(maxNum + 1 + produced).padStart(2, '0');
-    const name = `Trial ${maxNum + 1 + produced}`;
-    const id = `${num}-${slugify(name)}`;
-    const opts = slotOptionsFor(curveIndex, id, name);
+  try {
+    while (produced < count) {
+      const levelIndex = maxNum + produced; // 0-based play index of the new level
+      const num = String(maxNum + 1 + produced).padStart(2, '0');
+      const name = `Trial ${maxNum + 1 + produced}`;
+      const id = `${num}-${slugify(name)}`;
+      const plan = tierPlan(levelIndex);
 
-    const cand = drawCurriculumRising(eng, gen, opts, levelIndex, rng, prevDiff, existingSignatures);
-    curveIndex++;
-    if (!cand) {
-      if (curveIndex - (maxNum + 1 + produced) > 40) {
-        throw new Error(`extend: exhausted attempts producing level ${num}`);
+      if (plan.pyramid !== curPyramid) {
+        curPyramid = plan.pyramid;
+        realWarn(
+          `  pyramid ${String(curPyramid).padStart(2)} (tier ${curPyramid}) — ` +
+            `board ${plan.size}x${plan.size}, ${plan.monsters.length} monsters, ` +
+            `target≈${plan.center.toFixed(1)} …`,
+        );
       }
-      continue;
-    }
 
-    const spec = { ...cand.spec, id, name };
-    const { par, difficulty, check } = finalize(eng, gen, spec, levelIndex);
-    const finalSpec = { ...spec, par };
-    existingSignatures.add(signature(finalSpec));
-    writeSpec(num, finalSpec);
-    rows.push(rowFor(levelIndex, finalSpec, par, difficulty, check, 'generated combination'));
-    prevDiff = Math.max(prevDiff, difficulty.score);
-    produced++;
+      const cand = drawTierLevel(eng, gen, levelIndex, plan, id, name, rng, existingSignatures);
+      if (!cand) {
+        throw new Error(
+          `extend: could not fill level ${num} (pyramid ${plan.pyramid}); ` +
+            `board too constrained for any curriculum-passing level`,
+        );
+      }
+
+      const spec = { ...cand.spec, id, name };
+      const { par, difficulty, check } = finalize(eng, gen, spec, levelIndex);
+      const finalSpec = { ...spec, par };
+      existingSignatures.add(signature(finalSpec));
+      writeSpec(num, finalSpec);
+      rows.push(rowFor(levelIndex, finalSpec, par, difficulty, check, `pyramid ${plan.pyramid}`));
+
+      const agg = perPyramid.get(plan.pyramid) ?? { min: Infinity, max: -Infinity, count: 0 };
+      agg.min = Math.min(agg.min, difficulty.score);
+      agg.max = Math.max(agg.max, difficulty.score);
+      agg.count++;
+      perPyramid.set(plan.pyramid, agg);
+
+      produced++;
+      if (produced % 10 === 0) {
+        const secs = ((Date.now() - t0) / 1000).toFixed(0);
+        realWarn(`    … ${produced}/${count} levels (${secs}s elapsed)`);
+      }
+    }
+  } finally {
+    console.warn = realWarn;
   }
 
   rewriteIndex();
-  printTable(`Appended ${count} level(s) (existing top difficulty ${ceilingDiff.toFixed(2)})`, rows);
+  printTable(`Appended ${count} level(s)`, rows);
   assertPackInvariants(rows);
+
+  // Per-pyramid difficulty ramp summary.
+  console.log('Per-pyramid difficulty ranges (proving a gentle rising ramp):\n');
+  for (const [pyr, agg] of [...perPyramid.entries()].sort((a, b) => a[0] - b[0])) {
+    console.log(
+      `  pyramid ${String(pyr).padStart(2)}: ${agg.count} levels, ` +
+        `score ${agg.min.toFixed(2)} – ${agg.max.toFixed(2)}`,
+    );
+  }
+  console.log(`\nGeneration completed in ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
 }
 
 main().catch((err) => {
