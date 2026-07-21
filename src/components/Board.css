@@ -176,6 +176,9 @@
   top: 0;
   left: 0;
   z-index: 8;
+  /* Parent .board__overlay is pointer-events:none — re-enable here so the SVG
+     actually receives the right-click-drag (children inherit none otherwise). */
+  pointer-events: auto;
   /* Right-drag must not scroll or select; left/right presses are handled in JS. */
   touch-action: none;
   filter: drop-shadow(0 1px 2px rgba(10, 20, 40, 0.5));
