@@ -77,11 +77,14 @@ export function MummySprite({
   className,
   variant = 'white',
 }: SpriteProps & { variant?: 'white' | 'red' }) {
-  const base = variant === 'red' ? '#d8a07a' : '#e7dec2';
-  const shade = variant === 'red' ? '#b07a54' : '#c9bc95';
-  const hi = variant === 'red' ? '#e6b895' : '#f3ecd7';
-  const band = variant === 'red' ? '#9a6844' : '#b3a67f';
-  const eye = variant === 'red' ? '#ff4b4b' : '#ffcf3a';
+  // Strong colour separation so white vs red reads at a glance: bone-cream vs a
+  // saturated terracotta-red wrap. Red's eyes go bright gold (red-on-red would
+  // vanish); white keeps gold eyes but a clearly pale body.
+  const base = variant === 'red' ? '#d24f38' : '#ece3c8';
+  const shade = variant === 'red' ? '#9c3320' : '#c9bc95';
+  const hi = variant === 'red' ? '#ec7d61' : '#f5efdc';
+  const band = variant === 'red' ? '#7d2c1e' : '#a99c73';
+  const eye = variant === 'red' ? '#ffe14b' : '#ffcf3a';
   const cid = `mumclip-${variant}`;
   const body =
     'M32 14 C 44 14, 47 25, 46 34 C 45 47, 40 56, 32 56 C 24 56, 19 47, 18 34 C 17 25, 20 14, 32 14 Z';
@@ -134,9 +137,10 @@ export function ScorpionSprite({
   className,
   variant = 'white',
 }: SpriteProps & { variant?: 'white' | 'red' }) {
-  const base = variant === 'red' ? '#b34532' : '#b98b46';
-  const shade = variant === 'red' ? '#82291d' : '#8a6531';
-  const hi = variant === 'red' ? '#cf6350' : '#cfa259';
+  // Match the mummy separation: a vivid red carapace vs a light sandy-amber one.
+  const base = variant === 'red' ? '#cf4130' : '#c99f4a';
+  const shade = variant === 'red' ? '#8a2417' : '#8a6531';
+  const hi = variant === 'red' ? '#e56a54' : '#e6c576';
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" className={className} aria-label={`${variant} scorpion`}>
       {/* tail arcing over from the rear, stinger poised */}
