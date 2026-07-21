@@ -201,19 +201,20 @@ export function Board({ level, render, cellSize }: BoardProps) {
   const vSet = new Set<string>();
   for (const s of walls) (s.orient === 'h' ? hSet : vSet).add(segKey(s.x, s.y));
 
-  // For the planning arrows: given a tile, if a living MUMMY sits there, return
-  // its deterministic step path THIS turn (start -> intermediate -> destination),
-  // computed against the current player position with the real pursuit rules
-  // (red steps vertical-first). Only mummies double-step; scorpions/others => null.
-  const mummyPathFrom = (from: Pos): Pos[] | null => {
+  // For the planning arrows: if `from` holds a living MUMMY and `to` is exactly a
+  // double-step (Manhattan distance 2) away that the mummy can actually reach in
+  // its 2 steps, return the routed path (start -> intermediate -> to) using the
+  // real pursuit rules toward that target — so red routes vertical-first, white
+  // horizontal-first, and walls redirect it. Otherwise null (=> straight arrow).
+  // Only mummies double-step; scorpions/others => null.
+  const mummyPath = (from: Pos, to: Pos): Pos[] | null => {
     const m = render.monsters.find((mm) => mm.alive && samePos(mm.pos, from));
     if (!m || !m.kind.startsWith('mummy')) return null;
-    const s1 = monsterStep(level, render.gatesOpen, m.kind, m.pos, render.player);
-    const s2 = monsterStep(level, render.gatesOpen, m.kind, s1, render.player);
-    const path: Pos[] = [m.pos];
-    if (!samePos(s1, path[path.length - 1])) path.push(s1);
-    if (!samePos(s2, path[path.length - 1])) path.push(s2);
-    return path;
+    if (Math.abs(to.x - from.x) + Math.abs(to.y - from.y) !== 2) return null;
+    const s1 = monsterStep(level, render.gatesOpen, m.kind, from, to);
+    const s2 = monsterStep(level, render.gatesOpen, m.kind, s1, to);
+    if (!samePos(s2, to) || samePos(s1, from)) return null; // can't reach in 2 steps
+    return [from, s1, to];
   };
 
   return (
@@ -348,7 +349,7 @@ export function Board({ level, render, cellSize }: BoardProps) {
           width={level.width}
           height={level.height}
           levelId={level.id}
-          enemyPath={mummyPathFrom}
+          enemyPath={mummyPath}
         />
       </div>
     </div>

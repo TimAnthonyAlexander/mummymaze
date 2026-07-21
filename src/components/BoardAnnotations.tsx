@@ -27,11 +27,12 @@ interface Props {
   /** Resets annotations when it changes. */
   levelId: string;
   /**
-   * For a tile occupied by a living mummy, its deterministic step path this turn
-   * (`[start, ...intermediate, destination]`); null for any other tile. Used to
-   * bend an arrow along the mummy's double-step when it targets that destination.
+   * If `from` holds a mummy and `to` is exactly its double-step away, the routed
+   * path `[from, intermediate, to]` (red vertical-first, white horizontal-first,
+   * walls respected); null otherwise. Used to bend the arrow along the mummy's
+   * two hops instead of drawing straight.
    */
-  enemyPath?: (from: Pos) => Pos[] | null;
+  enemyPath?: (from: Pos, to: Pos) => Pos[] | null;
 }
 
 export function BoardAnnotations({ cell, width, height, levelId, enemyPath }: Props) {
@@ -51,19 +52,13 @@ export function BoardAnnotations({ cell, width, height, levelId, enemyPath }: Pr
 
   /**
    * Resolve an arrow to the tile points it should be drawn through. If it starts
-   * on a mummy AND its target is exactly that mummy's 2-step destination, follow
-   * the mummy's real path (bent). Otherwise a plain start->target straight arrow.
+   * on a mummy and targets a tile exactly a double-step away that the mummy can
+   * reach, follow the mummy's routed two hops (bent). Otherwise a plain straight
+   * start->target arrow.
    */
   const resolveArrow = (a: Arrow): { points: Pos[]; enemy: boolean } => {
-    const path = enemyPath?.(a.from) ?? null;
-    if (
-      path &&
-      path.length >= 2 &&
-      !samePos(a.from, a.to) &&
-      samePos(a.to, path[path.length - 1])
-    ) {
-      return { points: path, enemy: true };
-    }
+    const path = enemyPath?.(a.from, a.to) ?? null;
+    if (path && path.length >= 2) return { points: path, enemy: true };
     return { points: [a.from, a.to], enemy: false };
   };
   const dragArrow = drag && !samePos(drag.from, drag.to) ? resolveArrow(drag) : null;
