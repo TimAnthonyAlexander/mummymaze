@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, Stack, Typography } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import { ArrowLeft } from 'lucide-react';
 import { PYRAMIDS, getPyramidOfLevel, type Pyramid } from '../levels/pyramids';
 import { useProgress } from '../game/useProgress';
@@ -14,7 +14,7 @@ function currentPyramid(): Pyramid {
   return (lastId && getPyramidOfLevel(lastId)) || PYRAMIDS[0];
 }
 
-/** Full-page world map of all pyramids. Reachable at `/map`. */
+/** Full-viewport world map. Reachable at `/map`. */
 export function MapPage() {
   const navigate = useNavigate();
   const { unlocked, completed, pyramidProgress } = useProgress();
@@ -29,58 +29,69 @@ export function MapPage() {
   const backTo = currentId ?? LEVELS[0].id;
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        width: '100%',
-        bgcolor: 'background.default',
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        px: { xs: 2, sm: 4 },
-        py: { xs: 3, sm: 5 },
-      }}
-    >
-      <Stack sx={{ maxWidth: 1320, mx: 'auto', gap: { xs: 3, sm: 4 } }}>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
+    <Box sx={{ position: 'fixed', inset: 0, overflow: 'hidden', bgcolor: '#14100a' }}>
+      <WorldTrail
+        pyramids={PYRAMIDS}
+        activeIndex={activeIndex}
+        currentId={currentId}
+        unlocked={unlocked}
+        completed={completed}
+        pyramidProgress={pyramidProgress}
+        onSelect={onSelect}
+      />
+
+      {/* Overlay chrome: solid stone tabs above the map; only they catch input. */}
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 1,
+          px: { xs: 1.5, sm: 2.5 },
+          py: { xs: 1, sm: 1.5 },
+          pointerEvents: 'none',
+        }}
+      >
+        <Button
+          startIcon={<ArrowLeft size={18} />}
+          onClick={() => navigate(`/play/${backTo}`)}
+          color="inherit"
           sx={{
-            alignItems: { xs: 'flex-start', sm: 'center' },
-            justifyContent: 'space-between',
-            gap: 1.5,
+            pointerEvents: 'auto',
+            color: 'text.primary',
+            bgcolor: 'rgba(16,11,6,0.88)',
+            border: '1px solid rgba(201,154,30,0.28)',
+            '&:hover': { bgcolor: 'rgba(30,22,12,0.95)' },
           }}
         >
-          <Button
-            startIcon={<ArrowLeft size={18} />}
-            onClick={() => navigate(`/play/${backTo}`)}
-            color="inherit"
-            sx={{ color: 'text.secondary', ml: -1 }}
+          Back to game
+        </Button>
+        <Box
+          sx={{
+            textAlign: 'right',
+            px: { xs: 1.25, sm: 1.75 },
+            py: { xs: 0.5, sm: 0.75 },
+            borderRadius: 1.5,
+            bgcolor: 'rgba(16,11,6,0.88)',
+            border: '1px solid rgba(201,154,30,0.28)',
+          }}
+        >
+          <Typography
+            variant="h4"
+            color="primary"
+            sx={{ fontSize: { xs: '1.35rem', sm: '2rem' }, lineHeight: 1.1 }}
           >
-            Back to game
-          </Button>
-          <Stack sx={{ alignItems: { xs: 'flex-start', sm: 'flex-end' }, minWidth: 0 }}>
-            <Typography
-              variant="h4"
-              color="primary"
-              sx={{ fontSize: { xs: '1.6rem', sm: '2.125rem' }, lineHeight: 1.1 }}
-            >
-              The Necropolis
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {PYRAMIDS.length} tombs · choose your descent
-            </Typography>
-          </Stack>
-        </Stack>
-
-        <WorldTrail
-          pyramids={PYRAMIDS}
-          activeIndex={activeIndex}
-          currentId={currentId}
-          unlocked={unlocked}
-          completed={completed}
-          pyramidProgress={pyramidProgress}
-          onSelect={onSelect}
-        />
-      </Stack>
+            The Necropolis
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+            {PYRAMIDS.length} tombs · drag to explore
+          </Typography>
+        </Box>
+      </Box>
     </Box>
   );
 }

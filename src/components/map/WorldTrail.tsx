@@ -1,8 +1,8 @@
-import { type Ref, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Box, Typography } from '@mui/material';
 import { Check, Lock } from 'lucide-react';
 import type { Pyramid } from '../../levels/pyramids';
-import { displayName } from '../../levels/pyramids';
+import { displayName, pyramidLevelIds } from '../../levels/pyramids';
 import type { PyramidProgress } from '../../game/useProgress';
 import { computeTrailLayout, smoothPath, type TrailNode } from './trailLayout';
 import { PyramidSprite, type BlockState } from './PyramidSprite';
@@ -41,10 +41,10 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 function deriveSizing(width: number) {
   const perRow = width < 560 ? 2 : width < 920 ? 3 : 4;
   const cellW = width / perRow;
-  const tileSize = clamp(Math.round(cellW * 0.14), 17, 32);
+  const tileSize = clamp(Math.round(cellW * 0.14), 17, 34);
   const gap = Math.max(2, Math.round(tileSize * 0.12));
   // A pyramid is 4 blocks wide at the base and 4 courses tall → square bounds,
-  // plus a capstone and a torch/marker above, and a plaque below.
+  // plus a capstone and a torch above, and a plaque below.
   const shape = tileSize * 4 + gap * 3;
   const labelH = 44;
   return {
@@ -61,34 +61,7 @@ function deriveSizing(width: number) {
   };
 }
 
-interface Star {
-  x: number;
-  y: number;
-  r: number;
-  o: number;
-}
-
-/** Deterministic star field (no Math.random, so renders are stable). */
-function makeStars(width: number, height: number): Star[] {
-  const count = Math.round((width * height) / 14000);
-  let seed = 987654321;
-  const rnd = () => {
-    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
-    return seed / 0x7fffffff;
-  };
-  const out: Star[] = [];
-  for (let i = 0; i < count; i++) {
-    out.push({
-      x: rnd() * width,
-      y: rnd() * height,
-      r: 0.5 + rnd() * 1.2,
-      o: 0.06 + rnd() * 0.34,
-    });
-  }
-  return out;
-}
-
-/** The desert expedition map: pyramids on a rising serpentine trail. */
+/** The desert expedition map: a pannable scene of pyramids on a rising trail. */
 export function WorldTrail({
   pyramids,
   activeIndex,
@@ -99,8 +72,8 @@ export function WorldTrail({
   onSelect,
 }: WorldTrailProps) {
   const [ref, width] = useMeasuredWidth<HTMLDivElement>();
-  const activeNodeRef = useRef<HTMLDivElement | null>(null);
   const scrolledRef = useRef(false);
+  const [grabbing, setGrabbing] = useState(false);
 
   const sizing = useMemo(() => (width > 0 ? deriveSizing(width) : null), [width]);
 
@@ -118,11 +91,6 @@ export function WorldTrail({
     });
   }, [sizing, pyramids.length]);
 
-  const stars = useMemo(
-    () => (layout ? makeStars(layout.width, layout.height) : []),
-    [layout],
-  );
-
   const { walkedPath, aheadPath } = useMemo(() => {
     if (!layout) return { walkedPath: '', aheadPath: '' };
     const reached = clamp(activeIndex, 0, layout.nodes.length - 1);
@@ -132,16 +100,26 @@ export function WorldTrail({
     };
   }, [layout, activeIndex]);
 
-  // Land the player on "you are here": the trail rises from the bottom, so the
-  // active pyramid is usually below the fold early on. Scroll to it once.
+  // Camera: on open, center the viewport on the player's current tomb, so the
+  // journey reads outward from where they are rather than dumping them at the
+  // locked far end.
   useLayoutEffect(() => {
-    if (!layout || scrolledRef.current) return;
-    const el = activeNodeRef.current;
-    if (el) {
-      el.scrollIntoView({ block: 'center', behavior: 'auto' });
-      scrolledRef.current = true;
-    }
-  }, [layout]);
+    if (!layout || !sizing || scrolledRef.current) return;
+    const el = ref.current;
+    if (!el) return;
+    const n = layout.nodes[clamp(activeIndex, 0, layout.nodes.length - 1)];
+    el.scrollTo({
+      top: Math.max(0, n.y - sizing.shape * 0.4 - el.clientHeight / 2),
+      left: Math.max(0, n.x - el.clientWidth / 2),
+      behavior: 'auto',
+    });
+    scrolledRef.current = true;
+  }, [layout, sizing, activeIndex, ref]);
+
+  // Drag-to-pan (mouse). Touch/wheel use native scrolling; a small move
+  // threshold distinguishes a pan from a click so tombs stay tappable.
+  const drag = useRef({ down: false, moved: false, sx: 0, sy: 0, sl: 0, st: 0 });
+  useEffect(() => () => setGrabbing(false), []);
 
   const stateOf = (levelId: string): BlockState => {
     if (!unlocked.has(levelId)) return 'locked';
@@ -150,16 +128,82 @@ export function WorldTrail({
     return 'available';
   };
 
+  /** The level a pyramid's plaque jumps to: current tomb, else its next playable. */
+  const entryLevelOf = (pyramid: Pyramid): string | undefined => {
+    const ids = pyramidLevelIds(pyramid);
+    if (currentId && ids.includes(currentId)) return currentId;
+    const play = ids.find((id) => {
+      const s = stateOf(id);
+      return s === 'available' || s === 'current';
+    });
+    if (play) return play;
+    for (let i = ids.length - 1; i >= 0; i--) if (completed.has(ids[i])) return ids[i];
+    return unlocked.has(ids[0]) ? ids[0] : undefined;
+  };
+
   return (
-    <Box ref={ref} sx={{ width: '100%' }}>
+    <Box
+      ref={ref}
+      onPointerDown={(e) => {
+        if (e.pointerType !== 'mouse' || e.button !== 0) return;
+        const el = ref.current;
+        if (!el) return;
+        drag.current = { down: true, moved: false, sx: e.clientX, sy: e.clientY, sl: el.scrollLeft, st: el.scrollTop };
+        el.setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d.down) return;
+        const el = ref.current;
+        if (!el) return;
+        const dx = e.clientX - d.sx;
+        const dy = e.clientY - d.sy;
+        if (!d.moved && Math.hypot(dx, dy) > 4) {
+          d.moved = true;
+          setGrabbing(true);
+        }
+        if (d.moved) {
+          el.scrollLeft = d.sl - dx;
+          el.scrollTop = d.st - dy;
+        }
+      }}
+      onPointerUp={(e) => {
+        if (!drag.current.down) return;
+        drag.current.down = false;
+        setGrabbing(false);
+        try {
+          ref.current?.releasePointerCapture(e.pointerId);
+        } catch {
+          /* pointer already released */
+        }
+      }}
+      onClickCapture={(e) => {
+        // Swallow the click that ends a drag so panning never selects a tomb.
+        if (drag.current.moved) {
+          e.preventDefault();
+          e.stopPropagation();
+          drag.current.moved = false;
+        }
+      }}
+      sx={{
+        width: '100%',
+        height: '100%',
+        overflow: 'auto',
+        position: 'relative',
+        cursor: grabbing ? 'grabbing' : 'grab',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        touchAction: 'pan-x pan-y',
+      }}
+    >
       {layout && sizing && (
-        <Box sx={{ position: 'relative', width: layout.width, height: layout.height, mx: 'auto' }}>
+        <Box sx={{ position: 'relative', width: layout.width, height: layout.height }}>
           <Box
             component="svg"
             width={layout.width}
             height={layout.height}
             viewBox={`0 0 ${layout.width} ${layout.height}`}
-            sx={{ position: 'absolute', inset: 0, display: 'block', borderRadius: 3 }}
+            sx={{ position: 'absolute', inset: 0, display: 'block' }}
           >
             <defs>
               <filter id="goldGlow" x="-40%" y="-40%" width="180%" height="180%">
@@ -178,19 +222,13 @@ export function WorldTrail({
               </filter>
             </defs>
 
-            {/* Night desert sky. */}
+            {/* Flat night desert. */}
             <rect x={0} y={0} width={layout.width} height={layout.height} fill="#14100a" />
-            {stars.map((s, i) => (
-              <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#e7dcbd" opacity={s.o} />
-            ))}
-            {/* Moon. */}
-            <circle cx={layout.width * 0.84} cy={sizing.marginTop * 0.42} r={sizing.tileSize * 1.6} fill="#cdbb84" opacity={0.06} />
-            <circle cx={layout.width * 0.84} cy={sizing.marginTop * 0.42} r={sizing.tileSize * 0.9} fill="#e2d5a8" opacity={0.85} />
 
             {/* The sand road. */}
             <path d={layout.path} fill="none" stroke="#2b2112" strokeWidth={sizing.tileSize * 0.5} strokeLinecap="round" strokeLinejoin="round" />
             <path d={layout.path} fill="none" stroke="#6f5528" strokeWidth={sizing.tileSize * 0.34} strokeLinecap="round" strokeLinejoin="round" />
-            <path d={aheadPath} fill="none" stroke="rgba(214,196,140,0.28)" strokeWidth={2} strokeLinecap="round" strokeDasharray="2 10" />
+            <path d={aheadPath} fill="none" stroke="rgba(214,196,140,0.26)" strokeWidth={2} strokeLinecap="round" strokeDasharray="2 10" />
             <path
               d={walkedPath}
               fill="none"
@@ -201,7 +239,7 @@ export function WorldTrail({
               style={{ filter: 'drop-shadow(0 0 3px rgba(231,189,72,0.4))' }}
             />
 
-            {/* Pyramids, back (top rows) to front (bottom rows) so nearer ones overlap. */}
+            {/* Pyramids, back (top rows) to front (bottom rows) so nearer overlap. */}
             {[...pyramids]
               .map((pyramid, i) => ({ pyramid, i, node: layout.nodes[i] }))
               .sort((a, b) => a.node.y - b.node.y)
@@ -214,7 +252,7 @@ export function WorldTrail({
                       pyramidLocked={!progress.unlocked}
                       isActive={i === activeIndex}
                       stateOf={stateOf}
-                      labelOf={(id) => `${displayName(id)}`}
+                      labelOf={(id) => displayName(id)}
                       onSelect={onSelect}
                       tileSize={sizing.tileSize}
                       gap={sizing.gap}
@@ -224,20 +262,23 @@ export function WorldTrail({
               })}
           </Box>
 
-          {/* HTML plaques + active-node scroll anchor, overlaid on the scene. */}
-          {pyramids.map((pyramid, i) => (
-            <PlaqueLabel
-              key={pyramid.id}
-              node={layout.nodes[i]}
-              index={i}
-              name={pyramid.name}
-              isActive={i === activeIndex}
-              progress={pyramidProgress(pyramid)}
-              shape={sizing.shape}
-              tileSize={sizing.tileSize}
-              anchorRef={i === activeIndex ? activeNodeRef : undefined}
-            />
-          ))}
+          {/* Clickable stone plaques overlaid on the scene. */}
+          {pyramids.map((pyramid, i) => {
+            const entry = entryLevelOf(pyramid);
+            return (
+              <PlaqueLabel
+                key={pyramid.id}
+                node={layout.nodes[i]}
+                index={i}
+                name={pyramid.name}
+                isActive={i === activeIndex}
+                progress={pyramidProgress(pyramid)}
+                shape={sizing.shape}
+                tileSize={sizing.tileSize}
+                onClick={entry ? () => onSelect(entry) : undefined}
+              />
+            );
+          })}
         </Box>
       )}
     </Box>
@@ -252,15 +293,19 @@ interface PlaqueLabelProps {
   progress: PyramidProgress;
   shape: number;
   tileSize: number;
-  anchorRef?: Ref<HTMLDivElement>;
+  onClick?: () => void;
 }
 
-/** Carved-stone sign beneath a pyramid: its name and completion. */
-function PlaqueLabel({ node, index, name, isActive, progress, shape, tileSize, anchorRef }: PlaqueLabelProps) {
+/** Carved-stone sign beneath a pyramid: its name and completion; clickable. */
+function PlaqueLabel({ node, index, name, isActive, progress, shape, tileSize, onClick }: PlaqueLabelProps) {
   const locked = !progress.unlocked;
+  const clickable = !!onClick;
   return (
     <Box
-      ref={anchorRef}
+      component={clickable ? 'button' : 'div'}
+      type={clickable ? 'button' : undefined}
+      onClick={onClick}
+      aria-label={clickable ? `Go to ${name}` : name}
       sx={{
         position: 'absolute',
         left: node.x,
@@ -269,13 +314,18 @@ function PlaqueLabel({ node, index, name, isActive, progress, shape, tileSize, a
         width: Math.min(shape + 44, 208),
         px: 1,
         py: 0.5,
+        m: 0,
         borderRadius: 1,
         textAlign: 'center',
-        bgcolor: 'rgba(16,11,6,0.82)',
+        fontFamily: 'inherit',
+        bgcolor: 'rgba(16,11,6,0.86)',
         border: isActive ? '1px solid #e7bd48' : '1px solid rgba(201,154,30,0.28)',
         boxShadow: isActive ? '0 0 12px rgba(231,189,72,0.25)' : 'none',
         opacity: locked ? 0.7 : 1,
-        pointerEvents: 'none',
+        cursor: clickable ? 'pointer' : 'default',
+        pointerEvents: clickable ? 'auto' : 'none',
+        transition: 'transform 120ms ease, border-color 120ms ease',
+        '&:hover': clickable ? { transform: 'translateX(-50%) translateY(-2px)', borderColor: '#e7bd48' } : {},
       }}
     >
       <Typography
@@ -291,6 +341,7 @@ function PlaqueLabel({ node, index, name, isActive, progress, shape, tileSize, a
       </Typography>
       <Typography
         variant="caption"
+        component="span"
         sx={{
           display: 'flex',
           alignItems: 'center',
