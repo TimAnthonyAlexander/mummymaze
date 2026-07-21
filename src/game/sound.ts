@@ -48,6 +48,44 @@ function audio(): Ctx | null {
   }
 }
 
+/**
+ * Unlock audio from WITHIN a user gesture. Safari/iOS refuse to start an
+ * AudioContext outside a direct gesture and will not resume one from a
+ * setTimeout — but our sounds fire from the animation timeline (setTimeout), so
+ * without this the context stays 'suspended' forever and nothing is audible.
+ * Creating + resuming + starting a 1-frame silent buffer here does the unlock.
+ */
+function unlock(): void {
+  const c = audio();
+  if (!c) return;
+  try {
+    if (c.state === 'suspended') void c.resume();
+    const src = c.createBufferSource();
+    src.buffer = c.createBuffer(1, 1, c.sampleRate);
+    src.connect(c.destination);
+    src.start(0);
+  } catch {
+    // Unlock is best-effort.
+  }
+}
+
+let unlockInstalled = false;
+/** Install one-time gesture listeners that unlock audio on the first interaction. */
+function installUnlock(): void {
+  if (unlockInstalled) return;
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  unlockInstalled = true;
+  const events: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'touchend'];
+  const handler = () => {
+    unlock();
+    // Once the context is actually running we no longer need the listeners.
+    if (ctx && ctx.state === 'running') {
+      for (const e of events) window.removeEventListener(e, handler);
+    }
+  };
+  for (const e of events) window.addEventListener(e, handler);
+}
+
 /** True when sound is on. Reads storage once, then serves the cache. */
 export function isSoundEnabled(): boolean {
   if (enabled === undefined) {
@@ -69,9 +107,13 @@ export function setSoundEnabled(on: boolean): void {
   } catch {
     // Storage is best-effort; the cached flag still governs playback.
   }
-  // Touching the context on enable warms it up within the same user gesture.
-  if (on) audio();
+  // Fully unlock within the same user gesture on enable (Safari needs the
+  // silent-buffer kick, not just resume()).
+  if (on) unlock();
 }
+
+// Arm the gesture-based unlock as soon as this module loads on the client.
+installUnlock();
 
 // --- low-level voices -------------------------------------------------------
 
