@@ -69,14 +69,20 @@ export function GamePage() {
     recordedWinRef.current = null;
   }, [level?.id]);
 
-  // Live "advance to next level" callback for the Enter key. Kept in a ref so the
+  // Live "Enter" handler for the end-of-level screen, kept in a ref so the
   // key listener (subscribed once) always sees the current phase/level/next.
-  const goNextRef = useRef<() => void>(() => {});
+  // On WIN, Enter advances to the next level; on LOSE, Enter restarts (accepts
+  // the death and retries). During normal play Enter does nothing.
+  const onEnterRef = useRef<() => void>(() => {});
   useEffect(() => {
-    goNextRef.current = () => {
-      if (!level || state.phase !== 'won') return;
-      const nxt = nextInProgression(level.id);
-      if (nxt) navigate(`/play/${nxt}`);
+    onEnterRef.current = () => {
+      if (!level) return;
+      if (state.phase === 'won') {
+        const nxt = nextInProgression(level.id);
+        if (nxt) navigate(`/play/${nxt}`);
+      } else if (state.phase === 'lost') {
+        restart();
+      }
     };
   });
 
@@ -95,7 +101,7 @@ export function GamePage() {
       }
       if (key === 'Enter') {
         e.preventDefault();
-        goNextRef.current(); // advance to the next level once this one is won
+        onEnterRef.current(); // win -> next level; loss -> restart
         return;
       }
       const action = KEY_MAP[key];
