@@ -221,6 +221,16 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
     [cancel],
   );
 
+  const snap = useCallback(
+    (target: GameState) => {
+      cancel();
+      animatingRef.current = false;
+      setAnimating(false);
+      setRender(toRender(target));
+    },
+    [cancel],
+  );
+
   const move = useCallback(
     (action: Action) => {
       if (animatingRef.current) return; // input locked during a turn's animation
@@ -244,16 +254,6 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
       play(buildFrames(trace), present, finalRender, settle);
     },
     [play, snap],
-  );
-
-  const snap = useCallback(
-    (target: GameState) => {
-      cancel();
-      animatingRef.current = false;
-      setAnimating(false);
-      setRender(toRender(target));
-    },
-    [cancel],
   );
 
   const undo = useCallback(() => {

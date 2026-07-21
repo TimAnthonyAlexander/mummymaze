@@ -8,6 +8,7 @@ import { Controls } from './Controls';
 import { LevelDrawer } from './LevelDrawer';
 import { AppTitle } from './AppTitle';
 import { StatusChips } from './StatusChips';
+import { SettingsToggles } from './SettingsToggles';
 
 interface MobileShellProps {
   levels: readonly Level[];
@@ -20,12 +21,18 @@ interface MobileShellProps {
   completed: ReadonlySet<string>;
   bestMoves: Record<string, number>;
   hasNext: boolean;
+  hintDir: Action | null;
+  hintUsed: boolean;
+  solution: Action[] | null;
+  unsolvable: boolean;
   onSelectLevel: (id: string) => void;
   onResetProgress: () => void;
   onMove: (action: Action) => void;
   onUndo: () => void;
   onRestart: () => void;
   onNext: () => void;
+  onHint: () => void;
+  onShowSolution: () => void;
 }
 
 /**
@@ -44,12 +51,18 @@ export function MobileShell({
   completed,
   bestMoves,
   hasNext,
+  hintDir,
+  hintUsed,
+  solution,
+  unsolvable,
   onSelectLevel,
   onResetProgress,
   onMove,
   onUndo,
   onRestart,
   onNext,
+  onHint,
+  onShowSolution,
 }: MobileShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -79,6 +92,9 @@ export function MobileShell({
           <Box sx={{ flexShrink: 0 }}>
             <StatusChips state={state} animating={animating} />
           </Box>
+          <Box sx={{ flexShrink: 0 }}>
+            <SettingsToggles iconSize={18} compact />
+          </Box>
         </Toolbar>
       </AppBar>
 
@@ -100,6 +116,12 @@ export function MobileShell({
           onRestart={onRestart}
           canUndo={canUndo}
           disabled={animating || state.phase !== 'player'}
+          hintDir={hintDir}
+          hintUsed={hintUsed}
+          solution={solution}
+          unsolvable={unsolvable}
+          onHint={onHint}
+          onShowSolution={onShowSolution}
         />
       </Box>
 

@@ -1,0 +1,28 @@
+{
+  "id": "07-collision",
+  "name": "Collision",
+  "width": 6,
+  "height": 6,
+  "start": {
+    "x": 0,
+    "y": 3
+  },
+  "exit": {
+    "x": 2,
+    "y": 5,
+    "dir": "S"
+  },
+  "monsters": [
+    {
+      "kind": "mummy_white",
+      "x": 4,
+      "y": 2
+    },
+    {
+      "kind": "mummy_white",
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "par": 5
+}

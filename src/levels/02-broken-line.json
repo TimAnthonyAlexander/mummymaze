@@ -1,0 +1,30 @@
+{
+  "id": "02-broken-line",
+  "name": "Broken Line",
+  "width": 6,
+  "height": 6,
+  "start": {
+    "x": 2,
+    "y": 2
+  },
+  "exit": {
+    "x": 4,
+    "y": 0,
+    "dir": "N"
+  },
+  "walls": [
+    {
+      "x": 3,
+      "y": 3,
+      "dir": "S"
+    }
+  ],
+  "monsters": [
+    {
+      "kind": "mummy_white",
+      "x": 1,
+      "y": 4
+    }
+  ],
+  "par": 5
+}

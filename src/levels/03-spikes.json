@@ -1,6 +1,6 @@
 {
-  "id": "03-first-mummy",
-  "name": "First Mummy",
+  "id": "03-spikes",
+  "name": "Spikes",
   "width": 6,
   "height": 6,
   "start": {
@@ -9,15 +9,21 @@
   },
   "exit": {
     "x": 5,
-    "y": 0,
-    "dir": "N"
+    "y": 4,
+    "dir": "E"
   },
+  "traps": [
+    {
+      "x": 5,
+      "y": 3
+    }
+  ],
   "monsters": [
     {
       "kind": "mummy_white",
-      "x": 0,
-      "y": 5
+      "x": 5,
+      "y": 1
     }
   ],
-  "par": 5
+  "par": 3
 }

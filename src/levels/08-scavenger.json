@@ -1,0 +1,40 @@
+{
+  "id": "08-scavenger",
+  "name": "Scavenger",
+  "width": 7,
+  "height": 7,
+  "start": {
+    "x": 6,
+    "y": 3
+  },
+  "exit": {
+    "x": 5,
+    "y": 0,
+    "dir": "N"
+  },
+  "walls": [
+    {
+      "x": 6,
+      "y": 5,
+      "dir": "S"
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "dir": "S"
+    }
+  ],
+  "monsters": [
+    {
+      "kind": "mummy_white",
+      "x": 0,
+      "y": 5
+    },
+    {
+      "kind": "scorpion_red",
+      "x": 4,
+      "y": 2
+    }
+  ],
+  "par": 5
+}

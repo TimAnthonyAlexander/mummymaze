@@ -1,0 +1,44 @@
+{
+  "id": "09-lock-and-key",
+  "name": "Lock & Key",
+  "width": 6,
+  "height": 6,
+  "start": {
+    "x": 1,
+    "y": 1
+  },
+  "exit": {
+    "x": 0,
+    "y": 0,
+    "dir": "N"
+  },
+  "walls": [
+    {
+      "x": 0,
+      "y": 0,
+      "dir": "E"
+    }
+  ],
+  "gates": [
+    {
+      "x": 0,
+      "y": 0,
+      "dir": "S",
+      "open": false
+    }
+  ],
+  "keys": [
+    {
+      "x": 0,
+      "y": 1
+    }
+  ],
+  "monsters": [
+    {
+      "kind": "mummy_white",
+      "x": 3,
+      "y": 1
+    }
+  ],
+  "par": 3
+}

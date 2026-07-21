@@ -7,6 +7,7 @@ import type { Action } from '../engine';
 import { LEVELS, getLevel, nextLevelId } from '../levels';
 import { useAnimatedGame } from '../game/useAnimatedGame';
 import { useProgress } from '../game/useProgress';
+import { useHints } from '../game/useHints';
 import { Sidebar } from '../components/Sidebar';
 import { BoardPane } from '../components/BoardPane';
 import { MobileShell } from '../components/MobileShell';
@@ -37,6 +38,8 @@ export function GamePage() {
 
   const progress = useProgress();
   const { isUnlocked, recordWin, setLastPlayed } = progress;
+
+  const hints = useHints(state);
 
   // Reload engine when the route's level changes.
   useEffect(() => {
@@ -122,12 +125,18 @@ export function GamePage() {
         completed={progress.completed}
         bestMoves={progress.bestMoves}
         hasNext={Boolean(next)}
+        hintDir={hints.hintDir}
+        hintUsed={hints.hintUsed}
+        solution={hints.solution}
+        unsolvable={hints.unsolvable}
         onSelectLevel={selectLevel}
         onResetProgress={progress.resetProgress}
         onMove={move}
         onUndo={undo}
         onRestart={restart}
         onNext={() => next && navigate(`/play/${next}`)}
+        onHint={hints.requestHint}
+        onShowSolution={hints.showSolution}
       />
     );
   }
@@ -143,11 +152,17 @@ export function GamePage() {
         unlocked={progress.unlocked}
         completed={progress.completed}
         bestMoves={progress.bestMoves}
+        hintDir={hints.hintDir}
+        hintUsed={hints.hintUsed}
+        solution={hints.solution}
+        unsolvable={hints.unsolvable}
         onSelectLevel={selectLevel}
         onResetProgress={progress.resetProgress}
         onMove={move}
         onUndo={undo}
         onRestart={restart}
+        onHint={hints.requestHint}
+        onShowSolution={hints.showSolution}
       />
       <BoardPane
         state={state}

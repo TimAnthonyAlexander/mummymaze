@@ -1,0 +1,28 @@
+{
+  "id": "06-two-hunters",
+  "name": "Two Hunters",
+  "width": 7,
+  "height": 7,
+  "start": {
+    "x": 5,
+    "y": 4
+  },
+  "exit": {
+    "x": 6,
+    "y": 6,
+    "dir": "E"
+  },
+  "monsters": [
+    {
+      "kind": "mummy_white",
+      "x": 6,
+      "y": 1
+    },
+    {
+      "kind": "mummy_white",
+      "x": 1,
+      "y": 0
+    }
+  ],
+  "par": 4
+}

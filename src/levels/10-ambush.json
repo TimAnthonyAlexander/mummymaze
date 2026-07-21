@@ -1,0 +1,65 @@
+{
+  "id": "10-ambush",
+  "name": "Ambush",
+  "width": 8,
+  "height": 8,
+  "start": {
+    "x": 4,
+    "y": 4
+  },
+  "exit": {
+    "x": 3,
+    "y": 0,
+    "dir": "N"
+  },
+  "walls": [
+    {
+      "x": 2,
+      "y": 5,
+      "dir": "E"
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "dir": "S"
+    },
+    {
+      "x": 5,
+      "y": 6,
+      "dir": "E"
+    }
+  ],
+  "gates": [
+    {
+      "x": 4,
+      "y": 2,
+      "dir": "E",
+      "open": false
+    }
+  ],
+  "keys": [
+    {
+      "x": 1,
+      "y": 0
+    }
+  ],
+  "traps": [
+    {
+      "x": 0,
+      "y": 7
+    }
+  ],
+  "monsters": [
+    {
+      "kind": "mummy_white",
+      "x": 5,
+      "y": 6
+    },
+    {
+      "kind": "scorpion_red",
+      "x": 4,
+      "y": 1
+    }
+  ],
+  "par": 6
+}

@@ -1,0 +1,41 @@
+{
+  "id": "05-red-corridor",
+  "name": "Red Corridor",
+  "width": 7,
+  "height": 7,
+  "start": {
+    "x": 3,
+    "y": 3
+  },
+  "exit": {
+    "x": 4,
+    "y": 6,
+    "dir": "S"
+  },
+  "walls": [
+    {
+      "x": 4,
+      "y": 4,
+      "dir": "E"
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "dir": "E"
+    }
+  ],
+  "traps": [
+    {
+      "x": 4,
+      "y": 1
+    }
+  ],
+  "monsters": [
+    {
+      "kind": "mummy_red",
+      "x": 2,
+      "y": 2
+    }
+  ],
+  "par": 5
+}
