@@ -9,6 +9,24 @@ function spriteStyle(pos: Pos, cell: number): CSSProperties {
   return { transform: `translate(${pos.x * cell}px, ${pos.y * cell}px)` };
 }
 
+/** Cardinal direction from `from` toward `to`, by the dominant axis. */
+function faceToward(from: Pos, to: Pos): Dir {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (dx === 0 && dy === 0) return 'S';
+  if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'E' : 'W';
+  return dy > 0 ? 'S' : 'N';
+}
+
+/**
+ * Facing is applied as a horizontal mirror only (never a rotation): flipping
+ * left/right keeps the sprite upright and its separate ground shadow correct,
+ * while still turning the side-on scorpion toward its target.
+ */
+function mirrorStyle(facing: Dir): CSSProperties {
+  return facing === 'W' ? { transform: 'scaleX(-1)' } : {};
+}
+
 /**
  * A single extruded wall block on a tile boundary.
  * `orient: 'h'` sits on the horizontal line above tile column `x` at row line
@@ -82,31 +100,62 @@ function extrudeShadow(liftPx: number, sideColor: string): string {
   return layers.join(', ');
 }
 
+const segKey = (x: number, y: number) => `${x},${y}`;
+
 /**
- * A wall is a chunky slab (~a third of a tile thick) straddling its boundary
- * line. Because the block is lit top-left and casts its body down-right, the top
- * face reads as shifted UP-LEFT of its base. So along its run we extend the slab
- * by half its thickness only on the leading (left / top) end — that up-left
- * overhang is the 3D read and it also knits corners — while the trailing
- * (right / bottom) end stays flush with its tile so the slab never spills into
- * the neighbouring cell where the shadow already lives.
+ * A wall is a slim slab straddling its boundary line. Because the block is lit
+ * top-left and casts its body down-right, the top face reads as shifted UP-LEFT
+ * of its base, so we ALWAYS overhang the leading (left / top) end by half the
+ * thickness — that up-left overhang is the 3D read and knits most corners.
+ *
+ * The trailing (right / bottom) end stays flush by default (so a free end never
+ * spills into an empty neighbour where the shadow already lives) — UNLESS a
+ * perpendicular wall meets it there, in which case we overhang it too. That
+ * extension lands on the adjoining wall (never open floor), closing the square
+ * corner gap that otherwise appears where two trailing ends meet (e.g. a
+ * bottom-right corner). `hSet`/`vSet` hold every drawn wall segment.
  */
-function wallStyle(seg: WallSeg, cell: number): CSSProperties {
-  const thick = cell * 0.3;
+function wallStyle(
+  seg: WallSeg,
+  cell: number,
+  hSet: Set<string>,
+  vSet: Set<string>,
+): CSSProperties {
+  const thick = cell * 0.15;
   const half = thick / 2;
-  const lead = half; // up-left overhang
   if (seg.orient === 'h') {
+    const { x, y } = seg;
+    const left = half; // leading overhang (always)
+    // A vertical wall meets the right node (x+1,y) if one sits just above/below.
+    const right = vSet.has(segKey(x + 1, y)) || vSet.has(segKey(x + 1, y - 1)) ? half : 0;
     return {
-      transform: `translate(${seg.x * cell - lead}px, ${seg.y * cell - half}px)`,
-      width: cell + lead,
+      transform: `translate(${x * cell - left}px, ${y * cell - half}px)`,
+      width: cell + left + right,
       height: thick,
     };
   }
+  const { x, y } = seg;
+  const top = half; // leading overhang (always)
+  const bottom = hSet.has(segKey(x, y + 1)) || hSet.has(segKey(x - 1, y + 1)) ? half : 0;
   return {
-    transform: `translate(${seg.x * cell - half}px, ${seg.y * cell - lead}px)`,
+    transform: `translate(${x * cell - half}px, ${y * cell - top}px)`,
     width: thick,
-    height: cell + lead,
+    height: cell + top + bottom,
   };
+}
+
+/** The boundary segment a gate occupies, so it renders as a wall-like slab. */
+function gateSeg(g: { a: Pos; dir: Dir }): WallSeg {
+  switch (g.dir) {
+    case 'N':
+      return { orient: 'h', x: g.a.x, y: g.a.y };
+    case 'S':
+      return { orient: 'h', x: g.a.x, y: g.a.y + 1 };
+    case 'W':
+      return { orient: 'v', x: g.a.x, y: g.a.y };
+    default: // 'E'
+      return { orient: 'v', x: g.a.x + 1, y: g.a.y };
+  }
 }
 
 interface BoardProps {
@@ -118,21 +167,22 @@ interface BoardProps {
 
 export function Board({ level, render, cellSize }: BoardProps) {
   const cell = cellSize;
-  // Depth amounts scale with the tile so the tilt reads the same at any size.
+  // Depth amount scales with the tile so the tilt reads the same at any size.
   const wallLift = Math.max(4, Math.round(cell * 0.12));
-  const gateLift = Math.max(2, Math.round(wallLift * 0.5));
   const boardStyle = {
     '--cell': `${cell}px`,
     '--cols': level.width,
     '--rows': level.height,
-    '--sprite-lift': `${Math.round(cell * 0.09)}px`,
     '--wall-extrude': extrudeShadow(wallLift, 'var(--wall-side)'),
-    '--gate-extrude': extrudeShadow(gateLift, 'var(--wall-side)'),
   } as CSSProperties;
 
   const markerSize = Math.round(cell * 0.46);
   const charSize = Math.round(cell * 0.82);
   const walls = computeWallSegments(level);
+  // Lookup of every drawn wall segment, so wallStyle can close corner gaps.
+  const hSet = new Set<string>();
+  const vSet = new Set<string>();
+  for (const s of walls) (s.orient === 'h' ? hSet : vSet).add(segKey(s.x, s.y));
 
   return (
     <div className="board" style={boardStyle}>
@@ -164,65 +214,63 @@ export function Board({ level, render, cellSize }: BoardProps) {
           <div
             key={`sh-${seg.orient}-${seg.x}-${seg.y}`}
             className="wall-shadow"
-            style={wallStyle(seg, cell)}
+            style={wallStyle(seg, cell, hSet, vSet)}
           />
         ))}
+        {/* Closed-gate shadows share the wall shadow plane so tops cover them. */}
+        {level.gates.map((g) =>
+          render.gatesOpen[g.id] ? null : (
+            <div
+              key={`gsh-${g.id}`}
+              className="wall-shadow"
+              style={wallStyle(gateSeg(g), cell, hSet, vSet)}
+            />
+          ),
+        )}
         {walls.map((seg) => (
           <div
             key={`tp-${seg.orient}-${seg.x}-${seg.y}`}
-            className={`wall-top wall--${seg.orient}`}
-            style={wallStyle(seg, cell)}
+            className="wall-top"
+            style={wallStyle(seg, cell, hSet, vSet)}
           />
         ))}
-
-        {/* Real opening in the border wall the explorer walks out through. */}
-        <ExitOpening pos={level.exit.pos} dir={level.exit.dir} cell={cell} />
-
-        {/* Gates. */}
+        {/* Gate top faces sit on the wall top plane so wall/gate merge cleanly,
+            but render as a barred portcullis (bars across the run) so a gate is
+            structurally distinct from a solid wall. */}
         {level.gates.map((g) => {
+          const seg = gateSeg(g);
           const open = render.gatesOpen[g.id];
-          const horizontal = g.dir === 'N' || g.dir === 'S';
-          const x = g.a.x * cell;
-          const y = g.a.y * cell;
-          const style: CSSProperties = horizontal
-            ? {
-                transform: `translate(${x}px, ${y + (g.dir === 'S' ? cell - 3 : -3)}px)`,
-                width: cell,
-              }
-            : {
-                transform: `translate(${x + (g.dir === 'E' ? cell - 3 : -3)}px, ${y}px)`,
-                height: cell,
-              };
           return (
             <div
-              key={g.id}
-              className={`gate ${horizontal ? 'gate--h' : 'gate--v'} ${
-                open ? 'gate--open' : ''
-              }`}
-              style={style}
+              key={`gtp-${g.id}`}
+              className={`wall-top gate-top gate-top--${seg.orient} ${open ? 'gate-top--open' : ''}`}
+              style={wallStyle(seg, cell, hSet, vSet)}
             />
           );
         })}
 
-        {/* Monsters. */}
+        {/* Real opening in the border wall the explorer walks out through. */}
+        <ExitOpening pos={level.exit.pos} dir={level.exit.dir} cell={cell} />
+
+        {/* Monsters — each turns to face the player it is hunting. */}
         {render.monsters
           .filter((m) => m.alive)
           .map((m) => (
             <div key={m.id} className="sprite sprite--monster" style={spriteStyle(m.pos, cell)}>
               <span className="sprite__shadow" />
-              <span className="sprite__body">
+              <span className="sprite__body" style={mirrorStyle(faceToward(m.pos, render.player))}>
                 <MonsterSprite kind={m.kind} size={charSize} />
               </span>
             </div>
           ))}
 
-        {/* Explorer. */}
+        {/* Explorer — faces its last move direction. */}
         <div
           className="sprite sprite--player"
           style={{ ...spriteStyle(render.player, cell), opacity: render.playerOpacity }}
         >
           <span className="sprite__shadow" />
-          <span className="sprite__body">
+          <span className="sprite__body" style={mirrorStyle(render.playerFacing)}>
             <ExplorerSprite size={charSize} />
           </span>
         </div>

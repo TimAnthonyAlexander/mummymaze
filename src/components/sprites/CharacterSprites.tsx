@@ -1,12 +1,12 @@
 /**
- * Hand-authored inline-SVG character sprites, drawn to evoke the early-2000s
- * casual-tomb look (think the era's little rendered maze figurines): small
- * FRONT-FACING standing figures seen slightly from above, with warm cel shading
- * — flat base fills plus one hard shadow tone down-right and a light tone
- * up-left (light source top-left, matching the walls), a modest dark outline,
- * and a bit of cartoon personality. NO smooth gradients (those read modern/flat-
- * vector). Contact shadows come from the board (.sprite__shadow), so sprites
- * carry none themselves. 64x64 viewBox, transparent background, centered.
+ * Hand-authored inline-SVG character sprites, styled after the pre-rendered PNG
+ * art (cream bulky mummy, pith-helmet explorer, side-on amber scorpion) but with
+ * NO baked shadow — the board draws a separate static circular shadow under each
+ * (.sprite__shadow), so a sprite can be mirrored to face its target without the
+ * shadow moving or the perspective breaking. Warm cel shading: flat fills + one
+ * hard shadow tone down-right and a light tone up-left (light source top-left,
+ * matching the walls), a modest dark outline, a bit of personality. No smooth
+ * gradients. 64x64 viewBox, transparent, centered.
  */
 
 const OUTLINE = '#2a1d10';
@@ -128,7 +128,7 @@ export function MummySprite({
   );
 }
 
-/** Scorpion — the slower pursuer. variant 'white' or 'red'. */
+/** Scorpion — the slower pursuer. variant 'white' or 'red'. Drawn side-on. */
 export function ScorpionSprite({
   size = 48,
   className,
@@ -156,7 +156,7 @@ export function ScorpionSprite({
       <path d="M32 39 Q39 41 41 46 Q40 51 35 52 Q39 48 38 44 Q36 40 32 39 Z" fill={shade} />
       {/* segment lines */}
       <path d="M23 35 Q32 38 41 35 M24 40 Q32 43 40 40" stroke={shade} strokeWidth="1.8" fill="none" strokeLinecap="round" />
-      {/* claws reaching forward toward the viewer */}
+      {/* claws reaching forward */}
       <path d="M25 50 Q17 55 19 61 Q22 56 27 57 Z" fill={base} stroke={OUTLINE} strokeWidth="2.3" strokeLinejoin="round" />
       <path d="M39 50 Q47 55 45 61 Q42 56 37 57 Z" fill={base} stroke={OUTLINE} strokeWidth="2.3" strokeLinejoin="round" />
       {/* highlight + eyes */}

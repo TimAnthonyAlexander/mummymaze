@@ -102,31 +102,32 @@
   will-change: transform, opacity;
 }
 
-/* Cast shadow pooled on the tile, nudged down-right to match the light. */
+/* Static circular ground shadow, pooled under the sprite. It never mirrors or
+   rotates, so facing changes leave it (and the perspective) intact. */
 .sprite__shadow {
   position: absolute;
   left: 50%;
-  top: 70%;
-  width: 60%;
+  top: 72%;
+  width: 52%;
   height: 20%;
-  transform: translate(-42%, 0);
+  transform: translateX(-50%);
+  border-radius: 50%;
   background: radial-gradient(
     ellipse at center,
-    rgba(28, 18, 0, 0.42) 0%,
-    rgba(28, 18, 0, 0) 70%
+    rgba(24, 16, 2, 0.42) 0%,
+    rgba(24, 16, 2, 0.3) 45%,
+    rgba(24, 16, 2, 0) 72%
   );
   z-index: 0;
+  pointer-events: none;
 }
 
-/* The figure floats slightly above its shadow so it reads as standing up off
-   the board, with a soft down-right drop shadow of its own. */
+/* The character art, above its shadow. Only this layer mirrors to face a target. */
 .sprite__body {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  transform: translateY(calc(var(--sprite-lift) * -1));
-  filter: drop-shadow(2px 3px 1.5px rgba(0, 0, 0, 0.28));
   z-index: 1;
 }
 
@@ -146,21 +147,22 @@
   color: #2c7a4b;
 }
 
-/* Gates read as thin raised slabs matching the wall lighting. */
-.gate {
-  position: absolute;
-  background: var(--wall-top);
-  border-radius: 2px;
-  box-shadow: var(--gate-extrude);
-  z-index: 3;
+/* Gates use the wall two-plane system (.wall-shadow / .wall-top) so they merge
+   with real walls in 3D, but render as a dark barred PORTCULLIS — bars run
+   across the boundary — so a closed gate is structurally unmistakable next to a
+   solid sandstone wall. Bars are perpendicular to the gate's run: vertical bars
+   on a horizontal gate, horizontal bars on a vertical one. Open gates fade and
+   their shadow is not drawn (see Board.tsx). */
+.gate-top {
+  background: #241a10; /* dark recess behind the bars */
+  box-shadow: inset 0 0 0 1.5px #3a2c18;
 }
-.gate--open {
-  opacity: 0.2;
-  box-shadow: none;
+.gate-top--h {
+  background-image: repeating-linear-gradient(90deg, #8a5e2a 0 5px, #23180d 5px 9px);
 }
-.gate--h {
-  height: 6px;
+.gate-top--v {
+  background-image: repeating-linear-gradient(0deg, #8a5e2a 0 5px, #23180d 5px 9px);
 }
-.gate--v {
-  width: 6px;
+.gate-top--open {
+  opacity: 0.18;
 }

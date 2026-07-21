@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   type Action,
+  type Dir,
   type GameState,
   type Level,
   type TraceEvent,
@@ -218,6 +219,7 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
   historyRef.current = history;
   const animatingRef = useRef(false);
   const timerRef = useRef<number | null>(null);
+  const playerFacingRef = useRef<Dir>('S');
 
   const cancel = useCallback(() => {
     if (timerRef.current !== null) {
@@ -229,14 +231,14 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
   const play = useCallback(
     (
       frames: Frame[],
-      from: GameState,
+      startRender: RenderState,
       finalRender: RenderState,
       settle: (() => void) | null,
     ) => {
       cancel();
       animatingRef.current = true;
       setAnimating(true);
-      let r = toRender(from);
+      let r = startRender;
       setRender(r);
       let i = 0;
       const runNext = () => {
@@ -277,8 +279,16 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
       const { state: next, trace } = stepWithTrace(present, action);
       if (next === present) return; // nothing happened (should not occur in player phase)
       dispatch({ type: 'commit', next });
+      // The explorer turns to face any directional input, even a blocked bump.
+      if (action !== 'wait') playerFacingRef.current = action as Dir;
+      const facing = playerFacingRef.current;
       const exited = trace.some((e) => e.kind === 'exit');
-      const finalRender: RenderState = { ...toRender(next), playerOpacity: exited ? 0 : 1 };
+      const startRender: RenderState = { ...toRender(present), playerFacing: facing };
+      const finalRender: RenderState = {
+        ...toRender(next),
+        playerFacing: facing,
+        playerOpacity: exited ? 0 : 1,
+      };
       const settle = settleSound(next.phase);
 
       if (!animationsEnabled()) {
@@ -289,7 +299,7 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
         settle?.();
         return;
       }
-      play(buildFrames(trace), present, finalRender, settle);
+      play(buildFrames(trace), startRender, finalRender, settle);
     },
     [play, snap],
   );

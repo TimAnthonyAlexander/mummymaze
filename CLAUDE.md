@@ -42,7 +42,10 @@ Three layers, cleanly separated.
 - `monsters.ts` — the pursuit AI + `stepsPerTurn`.
 - `step.ts` — `initGame`, `step(state, action)` (the single transition; pure),
   and `stepWithTrace` which also returns an ordered TRACE of single-tile events
-  (move/gate/kill/exit) used to animate a turn one hop at a time.
+  (move/gate/kill/exit) used to animate a turn one hop at a time. Each `move`
+  event carries a `round` (player hop = 0; a monster's s-th sub-step = s+1) so
+  the UI can play a whole round at once — monsters step SIMULTANEOUSLY — while
+  the engine still RESOLVES them sequentially (order decides collisions).
 - `solver.ts` — `solve(level, opts?)` and `solveFrom(state, opts?)`: exact BFS
   over player actions (monsters are deterministic, so it's single-agent
   shortest-path, NOT minimax). `opts.cap` bounds the state search;
@@ -59,10 +62,13 @@ Three layers, cleanly separated.
 **2. Game/React glue — `src/game/`:**
 - `useAnimatedGame.ts` — the game hook. Keeps committed engine state
   authoritative and plays each turn's trace on a `setTimeout` timeline (sprites
-  hop one tile at a time; win walks the player out the exit). Holds undo history.
+  hop one tile at a time; win walks the player out the exit). `buildFrames`
+  BATCHES the trace by `round` so all monsters step at the same tick (via one
+  `setRender` + the CSS transform transition), not one-after-another. Holds undo
+  history. Tracks the explorer's facing (last move dir) into `playerFacing`.
   Triggers sound at trace events; honors the animations setting (snap when off).
 - `render.ts` — `RenderState` + `toRender` (what `Board` draws, decoupled from
-  `GameState`).
+  `GameState`). Includes `playerFacing: Dir` (defaults south) for sprite facing.
 - `sound.ts` — procedural Web Audio SFX (no files). **See Safari gotcha below.**
 - `storage.ts` — safe localStorage wrapper, key `maze-escape:v1`; degrades to
   in-memory, never throws.
@@ -76,9 +82,21 @@ Three layers, cleanly separated.
 - `pages/GamePage.tsx` — the shell. Branches on `useMediaQuery(down('md'))`:
   desktop = `Sidebar` + `BoardPane`; mobile = `MobileShell`. Owns keyboard input.
 - `components/Board.tsx` (+ `Board.css`) — the square board, sprites, walls,
-  exit opening. **Do not casually edit `Board.css` sprite/exit rules.**
+  gates, exit opening. The grid stays a flat perfect square; depth is FAKED
+  (light source top-left). Walls are extruded slabs computed by
+  `computeWallSegments` + `wallStyle`, drawn in TWO PLANES: a transparent
+  `.wall-shadow` (a stacked down-right `box-shadow` from `extrudeShadow` = the
+  side faces + cast shadow) under a solid `.wall-top`, so connected walls merge
+  (a top always covers a neighbour's shadow) and only the outer silhouette
+  extrudes. Gates reuse the same two-plane classes (so they merge in 3D) but the
+  top is a barred `gate-top` portcullis. **Do not casually edit `Board.css`
+  sprite/wall/gate/exit rules.**
 - `components/sprites/CharacterSprites.tsx` — hand-drawn inline-SVG mummy /
-  explorer / scorpion. (Not in the depth-2 listing; it's under `components/`.)
+  explorer / scorpion, cel-shaded, styled after the pre-rendered PNGs in
+  `src/assets/sprites/` (those PNGs are unused reference now — kept, not
+  imported). The SVGs carry NO baked shadow; the board draws a separate static
+  circular `.sprite__shadow` under each and mirrors only the `.sprite__body`.
+  (Under `components/`; not in the depth-2 listing.)
 - Sidebar is composed of small pieces: `Sidebar`, `CurrentPyramidPanel`,
   `PyramidShape`, `LevelList`/`StatusPanel`/`StatusChips`/`AppTitle`/
   `SidebarFooter`, `Controls` (the d-pad), `SettingsToggles`. Mobile:
@@ -119,7 +137,9 @@ Three layers, cleanly separated.
 - Turn: player moves 1 tile or waits; then every monster moves. Mummies take 2
   steps/turn, scorpions 1. White = horizontal-first, red = vertical-first. Each
   monster greedily steps toward the player on its priority axis, falling back to
-  the other axis if blocked, and never voluntarily steps away.
+  the other axis if blocked, and never voluntarily steps away. The engine
+  resolves monsters in fixed order (order decides collisions), but the animation
+  plays each sub-step SIMULTANEOUSLY across all monsters (see the trace `round`).
 - **Wall-bump wastes the turn like a wait** (player stays, monsters still move) —
   intentional, tactically useful. Implemented in `step.ts` (`blocked → 'wait'`).
 - Two monsters colliding: the mover survives, the other is destroyed (a "merge").
@@ -149,6 +169,23 @@ Three layers, cleanly separated.
 - **Board exit opening** must stay `position: absolute` in `Board.css` — as an
   in-flow element it shifts the static origin the absolutely-positioned sprites
   translate from, dropping a sprite off-tile on some boards.
+- **Faux-3D walls (light top-left):** each wall's TOP FACE overhangs UP-LEFT
+  (leading edge) always — that overhang is the 3D read; it must NOT overhang
+  down-right into an empty neighbour (spills onto floor). A trailing (right/
+  bottom) end overhangs ONLY when a perpendicular wall meets it there (lands on
+  wall, closes the corner square gap). Merging depends on the two-plane z-order
+  (all shadows below all tops) — a border/rounding on `.wall-top` re-draws
+  internal seams as a visible gleam, so keep tops flat and butted.
+- **`.board` sets `isolation: isolate`** so the walls'/sprites' z-indexes stay
+  contained and the end-of-level `Paper` overlay (BoardPane, `zIndex: 5`) paints
+  ABOVE them. Overlay z-scale: wall-shadow 1, wall-top/gate 2, exit 4, monster 6,
+  player 7. Without the isolate, the win/lose buttons hide behind the walls.
+- **Sprite facing is a horizontal MIRROR, never a rotation.** The art is
+  top-down-ish with a look that breaks if rotated; rotating also spun the old
+  baked PNG shadow. So `.sprite__body` only flips L/R (mirrors on west) over a
+  separate, static `.sprite__shadow`. Monsters face the player; the explorer
+  faces its last move. (Lesson: pre-rendered sprites with baked shadows can't be
+  rotated cleanly — keep the shadow a separate board layer.)
 - **Running engine/levels headlessly** (no browser): use Vite `ssrLoadModule` in a
   `node --input-type=module` script (`createServer({server:{middlewareMode:true}})`
   → `ssrLoadModule('/src/engine/index.ts')`). The `WebSocket server error: Port
