@@ -1,0 +1,106 @@
+.board {
+  /* --cell is supplied at runtime via inline style (dynamic sizing). */
+  --cell: 56px;
+  --wall: #b08320;
+  --floor-a: #f3e7c4;
+  --floor-b: #ecdfb6;
+  --grid-line: rgba(120, 90, 20, 0.18);
+  position: relative;
+  display: inline-block;
+  padding: 6px;
+  background: #6b4f1d;
+  border-radius: 10px;
+  /* Drop shadow for depth plus a hairline gold ring so the sand board
+     stays crisp against the dark tomb background. */
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(201, 154, 30, 0.25);
+  user-select: none;
+}
+
+.board__grid {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), var(--cell));
+  grid-template-rows: repeat(var(--rows), var(--cell));
+  gap: 0;
+  border: 3px solid var(--wall);
+  background: var(--wall);
+}
+
+.cell {
+  position: relative;
+  width: var(--cell);
+  height: var(--cell);
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--grid-line);
+}
+
+.cell--a {
+  background: var(--floor-a);
+}
+.cell--b {
+  background: var(--floor-b);
+}
+
+.cell__marker {
+  opacity: 0.85;
+}
+
+/* Overlay layer for sprites, exit and gates so they can animate above cells. */
+.board__overlay {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  pointer-events: none;
+}
+
+.exit-opening {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.sprite {
+  position: absolute;
+  width: var(--cell);
+  height: var(--cell);
+  display: grid;
+  place-items: center;
+  transition: transform 120ms linear, opacity 200ms ease-out;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+}
+
+.sprite--player {
+  z-index: 3;
+}
+.sprite--monster {
+  z-index: 2;
+}
+
+.exit-marker {
+  position: absolute;
+  width: var(--cell);
+  height: var(--cell);
+  display: grid;
+  place-items: center;
+  color: #2c7a4b;
+}
+
+.gate {
+  position: absolute;
+  background: #7a4a1d;
+  border-radius: 2px;
+  z-index: 1;
+}
+.gate--open {
+  opacity: 0.25;
+}
+.gate--h {
+  height: 6px;
+}
+.gate--v {
+  width: 6px;
+}

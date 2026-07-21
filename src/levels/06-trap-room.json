@@ -1,0 +1,46 @@
+{
+  "id": "06-trap-room",
+  "name": "Trap Room",
+  "width": 7,
+  "height": 7,
+  "start": {
+    "x": 0,
+    "y": 6
+  },
+  "exit": {
+    "x": 4,
+    "y": 6,
+    "dir": "S"
+  },
+  "walls": [
+    {
+      "x": 0,
+      "y": 3,
+      "dir": "E"
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "dir": "E"
+    }
+  ],
+  "traps": [
+    {
+      "x": 5,
+      "y": 2
+    }
+  ],
+  "monsters": [
+    {
+      "kind": "scorpion_red",
+      "x": 1,
+      "y": 0
+    },
+    {
+      "kind": "scorpion_white",
+      "x": 1,
+      "y": 4
+    }
+  ],
+  "par": 5
+}

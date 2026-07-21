@@ -1,0 +1,28 @@
+{
+  "id": "05-two-hunters",
+  "name": "Two Hunters",
+  "width": 6,
+  "height": 6,
+  "start": {
+    "x": 3,
+    "y": 0
+  },
+  "exit": {
+    "x": 5,
+    "y": 2,
+    "dir": "E"
+  },
+  "monsters": [
+    {
+      "kind": "scorpion_white",
+      "x": 1,
+      "y": 4
+    },
+    {
+      "kind": "scorpion_red",
+      "x": 3,
+      "y": 4
+    }
+  ],
+  "par": 5
+}

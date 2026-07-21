@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Maze Escape">
+  <!-- Dark tomb background -->
+  <rect width="64" height="64" rx="14" fill="#1c1710"/>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="12.5" fill="none" stroke="#c99a1e" stroke-opacity="0.35" stroke-width="2"/>
+  <!-- Wrapped mummy head -->
+  <path d="M18 46 V30 C18 20 24.5 13 32 13 C39.5 13 46 20 46 30 V46 C46 49 44 51 41 51 H23 C20 51 18 49 18 46 Z" fill="#e8dbb4"/>
+  <!-- Bandage seams -->
+  <g stroke="#b3985e" stroke-width="2.2" stroke-linecap="round" fill="none">
+    <path d="M18.5 24 Q32 20.5 45.5 25"/>
+    <path d="M18 40 Q32 43 46 38.5"/>
+    <path d="M20 48.5 Q32 50.5 44 47"/>
+  </g>
+  <!-- Eye slots peering through the wrappings -->
+  <g fill="#2e2410">
+    <path d="M23.5 33.5 L30.5 32 L30 36 L24 36.5 Z"/>
+    <path d="M40.5 33.5 L33.5 32 L34 36 L40 36.5 Z"/>
+  </g>
+</svg>

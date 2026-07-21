@@ -1,0 +1,23 @@
+{
+  "id": "03-first-mummy",
+  "name": "First Mummy",
+  "width": 6,
+  "height": 6,
+  "start": {
+    "x": 4,
+    "y": 3
+  },
+  "exit": {
+    "x": 5,
+    "y": 0,
+    "dir": "N"
+  },
+  "monsters": [
+    {
+      "kind": "mummy_white",
+      "x": 0,
+      "y": 5
+    }
+  ],
+  "par": 5
+}

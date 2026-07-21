@@ -1,0 +1,90 @@
+/* Editor board visuals — mirrors the in-game sand board (Board.css) at a fixed,
+   comfortable cell size so authoring stays legible regardless of grid size. */
+.ed-board {
+  --wall: #b08320;
+  --floor-a: #f3e7c4;
+  --floor-b: #ecdfb6;
+  --grid-line: rgba(120, 90, 20, 0.18);
+  position: relative;
+  display: inline-block;
+  padding: 6px;
+  background: #6b4f1d;
+  border-radius: 10px;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(201, 154, 30, 0.25);
+  user-select: none;
+}
+
+.ed-grid {
+  position: relative;
+  border: 3px solid var(--wall);
+  box-sizing: content-box;
+}
+
+.ed-cells {
+  display: grid;
+  gap: 0;
+}
+
+.ed-cell {
+  box-sizing: border-box;
+  border: 1px solid var(--grid-line);
+  cursor: pointer;
+}
+.ed-cell--a {
+  background: var(--floor-a);
+}
+.ed-cell--b {
+  background: var(--floor-b);
+}
+.ed-cell:hover {
+  background: #ffe9a8;
+}
+
+.ed-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.ed-marker {
+  position: absolute;
+  display: grid;
+  place-items: center;
+}
+
+.ed-wall {
+  position: absolute;
+  background: var(--wall);
+  border-radius: 2px;
+  z-index: 2;
+}
+.ed-gate {
+  position: absolute;
+  background: #7a4a1d;
+  border-radius: 2px;
+  z-index: 2;
+}
+.ed-gate--open {
+  opacity: 0.4;
+  outline: 1px dashed #7a4a1d;
+}
+.ed-exit {
+  position: absolute;
+  background: #3aa06a;
+  border-radius: 2px;
+  z-index: 3;
+  box-shadow: 0 0 0 2px rgba(58, 160, 106, 0.35);
+}
+
+.ed-edge {
+  position: absolute;
+  z-index: 4;
+  cursor: pointer;
+}
+.ed-edge:hover {
+  background: rgba(201, 154, 30, 0.55);
+  border-radius: 2px;
+}

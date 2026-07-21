@@ -1,0 +1,23 @@
+{
+  "id": "02-slow-pursuit",
+  "name": "Slow Pursuit",
+  "width": 5,
+  "height": 5,
+  "start": {
+    "x": 4,
+    "y": 3
+  },
+  "exit": {
+    "x": 4,
+    "y": 0,
+    "dir": "N"
+  },
+  "monsters": [
+    {
+      "kind": "scorpion_red",
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "par": 4
+}

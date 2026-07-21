@@ -1,0 +1,5 @@
+# Solution — Locked Gate
+
+> Shortest line found by the BFS solver (par 5).
+
+`E S E S E`
