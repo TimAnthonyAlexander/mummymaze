@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { AppBar, Box, IconButton, Toolbar } from '@mui/material';
-import { Menu } from 'lucide-react';
-import type { Action, GameState, Level } from '../engine';
+import { AppBar, Box, IconButton, Toolbar, Tooltip } from '@mui/material';
+import { Map as MapIcon, Menu } from 'lucide-react';
+import type { Action, GameState } from '../engine';
 import type { RenderState } from '../game/render';
+import type { Pyramid } from '../levels/pyramids';
+import type { PyramidProgress } from '../game/useProgress';
 import { BoardPane } from './BoardPane';
 import { Controls } from './Controls';
 import { LevelDrawer } from './LevelDrawer';
@@ -11,7 +13,8 @@ import { StatusChips } from './StatusChips';
 import { SettingsToggles } from './SettingsToggles';
 
 interface MobileShellProps {
-  levels: readonly Level[];
+  pyramid: Pyramid;
+  pyramidProgress: PyramidProgress;
   currentId: string;
   state: GameState;
   render: RenderState;
@@ -19,7 +22,6 @@ interface MobileShellProps {
   animating: boolean;
   unlocked: ReadonlySet<string>;
   completed: ReadonlySet<string>;
-  bestMoves: Record<string, number>;
   hasNext: boolean;
   hintDir: Action | null;
   hintUsed: boolean;
@@ -27,6 +29,7 @@ interface MobileShellProps {
   unsolvable: boolean;
   onSelectLevel: (id: string) => void;
   onResetProgress: () => void;
+  onOpenMap: () => void;
   onMove: (action: Action) => void;
   onUndo: () => void;
   onRestart: () => void;
@@ -36,12 +39,13 @@ interface MobileShellProps {
 }
 
 /**
- * Phone layout (< md): a slim top bar with a drawer trigger, the square board
- * filling the width, and the movement controls pinned below — no page scroll,
- * no horizontal overflow down to 375px.
+ * Phone layout (< md): a slim top bar with a drawer trigger + map shortcut, the
+ * square board filling the width, and the movement controls pinned below — no
+ * page scroll, no horizontal overflow down to 375px.
  */
 export function MobileShell({
-  levels,
+  pyramid,
+  pyramidProgress,
   currentId,
   state,
   render,
@@ -49,7 +53,6 @@ export function MobileShell({
   animating,
   unlocked,
   completed,
-  bestMoves,
   hasNext,
   hintDir,
   hintUsed,
@@ -57,6 +60,7 @@ export function MobileShell({
   unsolvable,
   onSelectLevel,
   onResetProgress,
+  onOpenMap,
   onMove,
   onUndo,
   onRestart,
@@ -92,6 +96,16 @@ export function MobileShell({
           <Box sx={{ flexShrink: 0 }}>
             <StatusChips state={state} animating={animating} />
           </Box>
+          <Tooltip title="World map">
+            <IconButton
+              aria-label="World map"
+              onClick={onOpenMap}
+              size="small"
+              sx={{ color: 'primary.main', flexShrink: 0 }}
+            >
+              <MapIcon size={20} />
+            </IconButton>
+          </Tooltip>
           <Box sx={{ flexShrink: 0 }}>
             <SettingsToggles iconSize={18} compact />
           </Box>
@@ -128,15 +142,16 @@ export function MobileShell({
       <LevelDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        levels={levels}
+        pyramid={pyramid}
+        pyramidProgress={pyramidProgress}
         currentId={currentId}
         state={state}
         animating={animating}
         unlocked={unlocked}
         completed={completed}
-        bestMoves={bestMoves}
         onSelectLevel={onSelectLevel}
         onResetProgress={onResetProgress}
+        onOpenMap={onOpenMap}
       />
     </Box>
   );

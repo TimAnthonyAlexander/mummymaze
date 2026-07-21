@@ -4,7 +4,8 @@ import { Box, Button, Stack, Typography, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { Home } from 'lucide-react';
 import type { Action } from '../engine';
-import { LEVELS, getLevel, nextLevelId } from '../levels';
+import { LEVELS, getLevel } from '../levels';
+import { PYRAMIDS, getPyramidOfLevel, nextInProgression } from '../levels/pyramids';
 import { useAnimatedGame } from '../game/useAnimatedGame';
 import { useProgress } from '../game/useProgress';
 import { useHints } from '../game/useHints';
@@ -110,12 +111,16 @@ export function GamePage() {
     );
   }
 
-  const next = nextLevelId(level.id);
+  const next = nextInProgression(level.id);
+  const pyramid = getPyramidOfLevel(level.id) ?? PYRAMIDS[0];
+  const pyramidProgress = progress.pyramidProgress(pyramid);
+  const openMap = () => navigate('/map');
 
   if (isMobile) {
     return (
       <MobileShell
-        levels={LEVELS}
+        pyramid={pyramid}
+        pyramidProgress={pyramidProgress}
         currentId={level.id}
         state={state}
         render={render}
@@ -123,7 +128,6 @@ export function GamePage() {
         animating={animating}
         unlocked={progress.unlocked}
         completed={progress.completed}
-        bestMoves={progress.bestMoves}
         hasNext={Boolean(next)}
         hintDir={hints.hintDir}
         hintUsed={hints.hintUsed}
@@ -131,6 +135,7 @@ export function GamePage() {
         unsolvable={hints.unsolvable}
         onSelectLevel={selectLevel}
         onResetProgress={progress.resetProgress}
+        onOpenMap={openMap}
         onMove={move}
         onUndo={undo}
         onRestart={restart}
@@ -144,20 +149,21 @@ export function GamePage() {
   return (
     <Box sx={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden' }}>
       <Sidebar
-        levels={LEVELS}
+        pyramid={pyramid}
+        pyramidProgress={pyramidProgress}
         currentId={level.id}
         state={state}
         canUndo={game.canUndo}
         animating={animating}
         unlocked={progress.unlocked}
         completed={progress.completed}
-        bestMoves={progress.bestMoves}
         hintDir={hints.hintDir}
         hintUsed={hints.hintUsed}
         solution={hints.solution}
         unsolvable={hints.unsolvable}
         onSelectLevel={selectLevel}
         onResetProgress={progress.resetProgress}
+        onOpenMap={openMap}
         onMove={move}
         onUndo={undo}
         onRestart={restart}

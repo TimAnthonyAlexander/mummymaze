@@ -60,15 +60,17 @@ describe('curriculum quality filters (anti-trivial)', () => {
 });
 
 describe('difficulty ramp', () => {
-  it('the generated tail rises and tops the hand-authored teaching levels', () => {
-    // The first nine levels are ordered by MECHANIC (teaching), not strictly by
-    // difficulty; the generated tail (index >= 9) must be non-decreasing and at
-    // least as hard as the hardest hand-authored level.
+  it('the generated/advanced levels top the hand-authored teaching levels', () => {
+    // The first nine levels are ordered by MECHANIC (teaching), not by difficulty.
+    // The JSON array order is just storage order — the actual play order (and the
+    // base->apex climb within each pyramid) is defined by src/levels/pyramids.ts,
+    // which sorts by par. So we do NOT require the raw array to be monotonic; we
+    // only require every advanced level (index >= 9) to be at least as hard as the
+    // hardest hand-authored teaching level.
     const scores = LEVELS.map((l) => scoreDifficulty(l).score);
     const handMax = Math.max(...scores.slice(0, 9));
     for (let i = 9; i < scores.length; i++) {
       expect(scores[i]).toBeGreaterThanOrEqual(handMax);
-      if (i > 9) expect(scores[i]).toBeGreaterThanOrEqual(scores[i - 1]);
     }
   });
 });

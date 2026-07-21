@@ -1,15 +1,16 @@
+import type { ReactNode } from 'react';
 import {
   ArrowDown,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  CircleDot,
   Eye,
   Lightbulb,
   RotateCcw,
+  Squircle,
   Undo2,
 } from 'lucide-react';
-import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, Button, Stack, Tooltip, Typography } from '@mui/material';
 import type { Action } from '../engine';
 
 interface ControlsProps {
@@ -49,8 +50,77 @@ function DirArrow({ action }: { action: Action }) {
     case 'E':
       return <ArrowRight size={ARROW_SIZE} />;
     default:
-      return <CircleDot size={ARROW_SIZE} />;
+      return <Squircle size={ARROW_SIZE} />;
   }
+}
+
+/** A single square control button; shared treatment for the pad and the center. */
+function PadButton({
+  onClick,
+  disabled,
+  label,
+  highlighted = false,
+  center = false,
+  gridArea,
+  children,
+}: {
+  onClick: () => void;
+  disabled: boolean;
+  label: string;
+  highlighted?: boolean;
+  center?: boolean;
+  gridArea: string;
+  children: ReactNode;
+}) {
+  return (
+    <Tooltip title={label} disableInteractive>
+      <Box
+        component="button"
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={label}
+        sx={{
+          gridArea,
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          p: 0,
+          cursor: disabled ? 'default' : 'pointer',
+          borderRadius: center ? '50%' : '12px',
+          color: highlighted ? 'warning.light' : center ? 'text.secondary' : 'primary.light',
+          bgcolor: highlighted
+            ? 'rgba(201,154,30,0.30)'
+            : center
+              ? 'rgba(120,110,80,0.14)'
+              : 'rgba(201,154,30,0.08)',
+          border: highlighted
+            ? '2px solid #c99a1e'
+            : center
+              ? '1px dashed rgba(201,154,30,0.5)'
+              : '1px solid rgba(201,154,30,0.4)',
+          transition: 'transform 100ms ease, background-color 120ms ease, filter 120ms ease',
+          '&:disabled': { opacity: 0.4, cursor: 'default' },
+          '&:hover:not(:disabled)': {
+            bgcolor: highlighted ? 'rgba(201,154,30,0.4)' : 'rgba(201,154,30,0.18)',
+            filter: 'brightness(1.08)',
+          },
+          '&:active:not(:disabled)': { transform: 'scale(0.92)' },
+          ...(highlighted && {
+            animation: 'hintPulse 1.1s ease-in-out infinite',
+            '@keyframes hintPulse': {
+              '0%, 100%': { boxShadow: '0 0 0 0 rgba(201,154,30,0.5)' },
+              '50%': { boxShadow: '0 0 10px 3px rgba(201,154,30,0.7)' },
+            },
+          }),
+        }}
+      >
+        {children}
+      </Box>
+    </Tooltip>
+  );
 }
 
 export function Controls({
@@ -66,68 +136,84 @@ export function Controls({
   onHint,
   onShowSolution,
 }: ControlsProps) {
-  const dpadBtn = (action: Action, icon: React.ReactNode, label: string) => {
-    const highlighted = hintDir === action;
-    return (
-      <Tooltip title={label}>
-        <span>
-          <IconButton
-            onClick={() => onMove(action)}
-            disabled={disabled}
-            sx={{
-              bgcolor: highlighted ? 'rgba(201,154,30,0.28)' : 'background.paper',
-              border: highlighted
-                ? '2px solid rgba(201,154,30,0.95)'
-                : '1px solid rgba(201,154,30,0.4)',
-              color: highlighted ? 'warning.light' : 'inherit',
-              '&:hover': { bgcolor: 'action.hover' },
-              ...(highlighted && {
-                animation: 'hintPulse 1.1s ease-in-out infinite',
-                '@keyframes hintPulse': {
-                  '0%, 100%': { boxShadow: '0 0 0 0 rgba(201,154,30,0.55)' },
-                  '50%': { boxShadow: '0 0 10px 4px rgba(201,154,30,0.75)' },
-                },
-              }),
-            }}
-          >
-            {icon}
-          </IconButton>
-        </span>
-      </Tooltip>
-    );
-  };
-
   const showHintButtons = Boolean(onHint || onShowSolution);
 
   return (
-    <Stack spacing={1.5} sx={{ alignItems: 'center' }}>
+    <Stack sx={{ alignItems: 'center', gap: 1.5 }}>
+      {/* Directional cluster: a 3×3 template with a cohesive tile treatment. */}
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(3, 48px)',
-          gridTemplateRows: 'repeat(3, 48px)',
-          gap: 1,
-          placeItems: 'center',
+          gridTemplateColumns: 'repeat(3, 46px)',
+          gridTemplateRows: 'repeat(3, 46px)',
+          gap: '6px',
+          p: '8px',
+          borderRadius: '18px',
+          bgcolor: 'rgba(20,16,10,0.5)',
+          border: '1px solid rgba(201,154,30,0.18)',
+          gridTemplateAreas: `
+            ".    up    ."
+            "left wait  right"
+            ".    down  ."
+          `,
         }}
       >
-        <Box />
-        {dpadBtn('N', <ArrowUp />, 'Up (↑ / W)')}
-        <Box />
-        {dpadBtn('W', <ArrowLeft />, 'Left (← / A)')}
-        {dpadBtn('wait', <CircleDot />, 'Wait (Space)')}
-        {dpadBtn('E', <ArrowRight />, 'Right (→ / D)')}
-        <Box />
-        {dpadBtn('S', <ArrowDown />, 'Down (↓ / S)')}
-        <Box />
+        <PadButton
+          gridArea="up"
+          onClick={() => onMove('N')}
+          disabled={disabled}
+          label="Up (↑ / W)"
+          highlighted={hintDir === 'N'}
+        >
+          <ArrowUp size={22} />
+        </PadButton>
+        <PadButton
+          gridArea="left"
+          onClick={() => onMove('W')}
+          disabled={disabled}
+          label="Left (← / A)"
+          highlighted={hintDir === 'W'}
+        >
+          <ArrowLeft size={22} />
+        </PadButton>
+        <PadButton
+          gridArea="wait"
+          onClick={() => onMove('wait')}
+          disabled={disabled}
+          label="Wait (Space)"
+          highlighted={hintDir === 'wait'}
+          center
+        >
+          <Squircle size={18} />
+        </PadButton>
+        <PadButton
+          gridArea="right"
+          onClick={() => onMove('E')}
+          disabled={disabled}
+          label="Right (→ / D)"
+          highlighted={hintDir === 'E'}
+        >
+          <ArrowRight size={22} />
+        </PadButton>
+        <PadButton
+          gridArea="down"
+          onClick={() => onMove('S')}
+          disabled={disabled}
+          label="Down (↓ / S)"
+          highlighted={hintDir === 'S'}
+        >
+          <ArrowDown size={22} />
+        </PadButton>
       </Box>
 
-      <Stack direction="row" spacing={1}>
+      <Stack direction="row" sx={{ gap: 1 }}>
         <Button
           onClick={onUndo}
           disabled={!canUndo}
           startIcon={<Undo2 size={18} />}
           variant="outlined"
           color="secondary"
+          size="small"
         >
           Undo
         </Button>
@@ -136,6 +222,7 @@ export function Controls({
           startIcon={<RotateCcw size={18} />}
           variant="outlined"
           color="warning"
+          size="small"
         >
           Restart
         </Button>
@@ -143,7 +230,7 @@ export function Controls({
 
       {showHintButtons && (
         <>
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" sx={{ gap: 1 }}>
             <Tooltip title={hintUsed ? 'Hint already used this level' : 'Reveal the next best move'}>
               <span>
                 <Button
@@ -187,18 +274,13 @@ export function Controls({
           )}
 
           {!unsolvable && solution && solution.length > 0 && (
-            <Stack spacing={0.5} sx={{ alignItems: 'center', maxWidth: 260 }}>
+            <Stack sx={{ alignItems: 'center', gap: 0.5, maxWidth: 260 }}>
               <Typography variant="caption" color="text.secondary">
                 Solution ({solution.length} {solution.length === 1 ? 'move' : 'moves'}):
               </Typography>
               <Stack
                 direction="row"
-                sx={{
-                  flexWrap: 'wrap',
-                  gap: 0.5,
-                  justifyContent: 'center',
-                  color: 'warning.light',
-                }}
+                sx={{ flexWrap: 'wrap', gap: 0.5, justifyContent: 'center', color: 'warning.light' }}
               >
                 {solution.map((a, i) => (
                   <Box

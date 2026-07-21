@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { LEVELS, getLevel } from './levels';
 import { GamePage } from './pages/GamePage';
+import { MapPage } from './pages/MapPage';
 import { EditorPage } from './pages/EditorPage';
 import { PlaytestPage } from './pages/PlaytestPage';
 import { loadSave } from './game/storage';
@@ -18,6 +19,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<Navigate to={`/play/${startId}`} replace />} />
       <Route path="/play/:levelId" element={<GamePage />} />
+      <Route path="/map" element={<MapPage />} />
       <Route path="/editor" element={<EditorPage />} />
       <Route path="/playtest" element={<PlaytestPage />} />
       <Route path="*" element={<Navigate to={`/play/${LEVELS[0].id}`} replace />} />
