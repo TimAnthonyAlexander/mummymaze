@@ -45,6 +45,8 @@ export interface LevelSpec {
   traps?: Pos[];
   monsters?: MonsterSpec[];
   par?: number;
+  /** If set, a flashlight/dark level (§2.7). View-only; engine ignores it. */
+  dark?: { radius: number };
 }
 
 function fail(id: string, msg: string): never {
@@ -149,6 +151,15 @@ export function loadLevel(spec: LevelSpec): Level {
     fail(id, 'start tile is a trap');
   }
 
+  let dark: { radius: number } | undefined;
+  if (spec.dark !== undefined) {
+    const r = spec.dark.radius;
+    if (typeof r !== 'number' || !Number.isFinite(r) || r <= 0) {
+      fail(id, `dark.radius must be a positive number, got ${r}`);
+    }
+    dark = { radius: r };
+  }
+
   return {
     id,
     name: spec.name,
@@ -160,5 +171,6 @@ export function loadLevel(spec: LevelSpec): Level {
     start: { x: spec.start.x, y: spec.start.y },
     monstersStart,
     par: spec.par,
+    ...(dark ? { dark } : {}),
   };
 }

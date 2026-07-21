@@ -141,6 +141,42 @@ Checked in this exact order:
 If all monsters are destroyed via collisions, the level becomes a trivial walk
 to the exit (still winnable — this is intended, it's a reward for good play).
 
+### 2.7 Darkness (flashlight levels)
+
+Some levels are **dark**. The maze is unlit except for a **pool of torchlight
+that follows the explorer** — a "flashlight" the player carries. This is the
+classic "dark pyramid" of the genre.
+
+**Critical: darkness is a view-layer, information-hiding feature only. It changes
+no rule.** Monsters still chase by the exact deterministic algorithm (§2.3),
+walls still block, keys/gates/traps behave identically, and the level's solution,
+`par`, solver result, and every engine unit test are unchanged whether the level
+is dark or not. The engine does not read the darkness flag at all — only the
+renderer does. Determinism (§3) is fully preserved, so undo and the BFS solver
+work exactly as in a lit level.
+
+The darkness rules the renderer applies:
+
+- **Lit region.** A level may declare `dark: { radius }`. A tile `(x, y)` is
+  *lit* iff its Euclidean distance to the explorer is `≤ radius + 0.5`
+  (`hypot(x - px, y - py) ≤ radius + 0.5`). Recommended `radius` is `2` (a soft
+  circular pool spanning a ~5×5 area). The light moves with the explorer and
+  follows it smoothly during the move animation.
+- **Walls and floor** outside the lit region are hidden (black). There is **no
+  persistent memory** — a tile re-darkens once the explorer moves away. Planning
+  around walls you can't currently see is the whole point of a dark level.
+- **Monsters** inside the lit region draw as full sprites. Outside it, a monster
+  shows only as a faint pair of **glowing eyes** — enough to sense the threat and
+  roughly locate it, not enough to hand the player the maze layout for free.
+- **The exit** always emits a soft **beacon glow** through the dark, so the player
+  knows which border edge they are heading for even while the walls between are
+  unlit.
+
+Because darkness only hides information, dark levels are authored **easier on
+pure solvability** than lit levels of the same tier (smaller boards, lower `par`,
+fewer monsters). The darkness supplies the difficulty; the underlying puzzle
+stays gentle so the level is fair rather than a memory-guessing slog.
+
 ---
 
 ## 3. Determinism & solvability
@@ -202,6 +238,7 @@ interface Level {
   exit: { pos: Pos; dir: Dir }; // border edge that is the exit
   start: Pos;               // explorer start
   monstersStart: Monster[];
+  dark?: { radius: number }; // if set, a flashlight level (§2.7); view-only
 }
 
 type Phase = 'player' | 'resolving' | 'won' | 'lost';
@@ -235,7 +272,8 @@ a loader expands it. Suggested authoring shape:
   "gates": [ { "x": 4, "y": 4, "dir": "S", "open": false } ],
   "keys": [ { "x": 1, "y": 1 } ],
   "traps": [ { "x": 5, "y": 5 } ],
-  "monsters": [ { "kind": "mummy_white", "x": 7, "y": 7 } ]
+  "monsters": [ { "kind": "mummy_white", "x": 7, "y": 7 } ],
+  "dark": { "radius": 2 }
 }
 ```
 
@@ -320,6 +358,13 @@ No backend; everything runs client-side.
 - Animation is **cosmetic only** — the authoritative state jumps instantly;
   the view interpolates. Never let animation gate input (queue or ignore input
   during the brief monster-move animation).
+- **Dark levels (§2.7)** add a torchlight overlay above the floor/walls: a black
+  layer with a soft radial "hole" centred on the explorer (radius from
+  `level.dark.radius`), so only nearby tiles are visible. Sprites are drawn above
+  the overlay and gated per-sprite: a monster outside the lit region renders as
+  glowing eyes instead of its full body; the exit keeps a faint beacon glow. The
+  lit/unlit test is a pure helper so it is unit-testable without the DOM. The
+  overlay respects `prefers-reduced-motion` (no light flicker).
 
 ### 6.4 Controls
 
@@ -350,6 +395,11 @@ dependent. We pick one deterministic ruling and document it so tests can pin it:
    levels so the player never *starts* on a trap.
 5. **Monster with zero distance on both axes** = it's on the player = caught
    (handled by the lose check before it matters).
+6. **Darkness never affects resolution.** A dark level (§2.7) is byte-for-byte
+   the same simulation as the identical lit level: same monster moves, same
+   collisions, same win/lose, same `par`, same solver output. Only what the
+   player can *see* differs. Tests pin this — a dark level and its lit twin
+   produce identical `step()` traces.
 
 ---
 
@@ -380,7 +430,11 @@ interface SaveData {
 
 - Levels grouped into "worlds" of increasing difficulty (e.g. introduce: basic
   chase → walls/dead-ends → two monsters → scorpions → traps → keys/gates →
-  combinations).
+  combinations → **darkness** (§2.7)).
+- **Dark levels** are grouped into their own dedicated pyramid. Because darkness
+  is a difficulty multiplier on its own, those levels are authored *easier* on
+  raw solvability (smaller boards, lower `par`) than lit levels of a comparable
+  slot.
 - Each level may declare an optional `par` (a known-good move count) for a
   score/star rating. Since the engine is deterministic, `par` can be verified by
   a BFS solver in tests (see §10).

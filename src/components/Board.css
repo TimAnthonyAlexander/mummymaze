@@ -166,3 +166,116 @@
 .gate-top--open {
   opacity: 0.18;
 }
+
+/* ── Dark / flashlight levels (SPEC §2.7) ──────────────────────────────────
+   A near-opaque warm-black overlay sitting ABOVE the walls/exit (z 4) but BELOW
+   the sprites (z 6/7), with a soft circular hole punched at the explorer. Only
+   tiles inside the hole show their floor and walls; everything else is hidden.
+   Sizing (width/height) and the light centre/radius come from inline vars set
+   in Board.tsx. Registering --light-x/y as typed custom properties lets the
+   pool GLIDE with the sprite (same 120ms linear timing) instead of jumping. */
+@property --light-x {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --light-y {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+
+.board__dark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 5;
+  background: radial-gradient(
+    circle at var(--light-x) var(--light-y),
+    transparent 0,
+    transparent var(--light-r),
+    rgba(6, 5, 3, 0.6) calc((var(--light-r) + var(--light-r2)) / 2),
+    rgba(6, 5, 3, 0.98) var(--light-r2)
+  );
+}
+@media (prefers-reduced-motion: no-preference) {
+  .board__dark {
+    transition:
+      --light-x 120ms linear,
+      --light-y 120ms linear;
+  }
+}
+
+/* A warm daylight glow bleeding in from the exit — always visible through the
+   dark so the player knows which way is out, without revealing the walls. */
+.exit-beacon {
+  position: absolute;
+  width: var(--cell);
+  height: var(--cell);
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    rgba(248, 236, 190, 0.55) 0%,
+    rgba(232, 205, 120, 0.28) 45%,
+    rgba(232, 205, 120, 0) 75%
+  );
+}
+@media (prefers-reduced-motion: no-preference) {
+  .exit-beacon {
+    animation: beacon-pulse 2.6s ease-in-out infinite;
+  }
+}
+@keyframes beacon-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* A monster hidden in the dark: no body, no shadow — just a faint pair of
+   glowing eyes so the threat is sensed and roughly located, not handed over. */
+.sprite--eyes {
+  display: grid;
+  place-items: center;
+}
+.dark-eyes {
+  display: flex;
+  gap: 22%;
+  align-items: center;
+  justify-content: center;
+  width: 40%;
+  height: 40%;
+}
+.dark-eye {
+  width: 26%;
+  height: 26%;
+  min-width: 4px;
+  min-height: 4px;
+  border-radius: 50%;
+  background: #ffd98a;
+  box-shadow:
+    0 0 4px 1px rgba(255, 200, 110, 0.9),
+    0 0 9px 3px rgba(255, 170, 60, 0.55);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dark-eye {
+    animation: eye-flicker 3.1s ease-in-out infinite;
+  }
+}
+@keyframes eye-flicker {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  45% {
+    opacity: 0.6;
+  }
+  70% {
+    opacity: 1;
+  }
+}

@@ -56,6 +56,11 @@
  *   node scripts/generate-levels.mjs extend <N>
  *       READ the existing pack and APPEND N new curriculum-filter-passing levels
  *       (bigger boards, merge allowed) WITHOUT renumbering existing files.
+ *
+ *   node scripts/generate-levels.mjs dark [N=10]
+ *       APPEND N EASY dark/flashlight levels (SPEC §2.7) as a new pyramid. Same
+ *       curriculum filters, but low difficulty + a `dark: { radius }` flag (the
+ *       darkness supplies the challenge). View-only, so no special solving.
  */
 import { createServer } from 'vite';
 import { readFileSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
@@ -314,6 +319,34 @@ function tierPlan(idx) {
   return { pyramid, pos, size, monsters, wallDensity, traps, center };
 }
 
+// ===========================================================================
+// DARK PYRAMID (flashlight levels, SPEC §2.7)
+//
+// Darkness is a VIEW-ONLY layer — the engine/solver never read it — so a dark
+// level is just an ordinary curriculum-passing level with a `dark` flag added.
+// Because darkness is itself a big difficulty multiplier, these are authored
+// EASIER on raw solvability than a lit tier: few monsters, sparse walls, low
+// par, and a low difficulty window (well under pyramid 3's ~40). Boards stay
+// big enough (8..10) that a radius-2 torch still leaves most of the maze dark.
+// ===========================================================================
+const DARK_FLOOR = 14;
+const DARK_RADIUS = 2;
+
+/** Easy tier plan for the pos-th (0..9) dark level, base->apex. */
+function darkTierPlan(pos) {
+  const size = pos < 4 ? 8 : pos < 8 ? 9 : 10;
+  const twoMonsters = pos >= 7; // only the apex trio of levels adds a 2nd hunter
+  // Always include a FAST mummy so the beeline-loss filter is achievable (a lone
+  // slow scorpion often can't catch a naive walker, stalling generation).
+  const monsters = twoMonsters
+    ? ['mummy_white', pos % 2 === 0 ? 'scorpion_red' : 'mummy_red']
+    : [pos % 2 === 0 ? 'mummy_white' : 'mummy_red'];
+  const wallDensity = Math.min(0.1, 0.04 + 0.005 * pos);
+  const traps = pos < 5 ? 0 : 1;
+  const center = 18 + pos * 1.6; // 18 .. ~32.4 — gentle, clearly below lit tiers
+  return { size, monsters, wallDensity, traps, center, key: false };
+}
+
 function slugify(name) {
   return name
     .toLowerCase()
@@ -482,7 +515,7 @@ function drawCurriculumRising(eng, gen, baseOpts, index, rng, prevDiff, existing
  * hard to fill. Guaranteed to return a curriculum-passing level (above the
  * floor) or null only if the board genuinely cannot host one.
  */
-function drawTierLevel(eng, gen, idx, plan, id, name, rng, existingSignatures) {
+function drawTierLevel(eng, gen, idx, plan, id, name, rng, existingSignatures, floor = EXTEND_FLOOR) {
   const opts = {
     id,
     name,
@@ -491,7 +524,7 @@ function drawTierLevel(eng, gen, idx, plan, id, name, rng, existingSignatures) {
     monsters: plan.monsters,
     wallDensity: plan.wallDensity,
     traps: plan.traps,
-    key: true,
+    key: plan.key ?? true,
     minStartExitDistance: 2,
     attempts: 90,
     cap: EXTEND_CAP,
@@ -515,7 +548,7 @@ function drawTierLevel(eng, gen, idx, plan, id, name, rng, existingSignatures) {
       if (existingSignatures.has(signature(cand.spec))) continue;
       if (gen.curriculumFailures(cand.level, idx, false).length) continue;
       const s = cand.difficulty.score;
-      if (s < EXTEND_FLOOR) continue;
+      if (s < floor) continue;
       const delta = Math.abs(s - plan.center);
       if (delta < fallbackDelta) {
         fallback = cand;
@@ -633,6 +666,12 @@ async function main() {
         throw new Error('extend mode requires a positive count, e.g. `extend 50`');
       }
       await runExtend(eng, gen, n);
+    } else if (mode === 'dark') {
+      const n = parseInt(process.argv[3] ?? '10', 10);
+      if (!Number.isInteger(n) || n <= 0) {
+        throw new Error('dark mode requires a positive count, e.g. `dark 10`');
+      }
+      await runDark(eng, gen, n);
     } else {
       throw new Error(`unknown mode "${mode}" (use "generate" or "extend")`);
     }
@@ -778,6 +817,64 @@ async function runExtend(eng, gen, count) {
     );
   }
   console.log(`\nGeneration completed in ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
+}
+
+/**
+ * Append `count` DARK levels (flashlight, SPEC §2.7) as a new pyramid. Each is a
+ * verified-solvable, curriculum-passing EASY layout with a `dark: { radius }`
+ * flag added. Darkness is view-only, so this needs no special solving — the same
+ * filters (solvable, beeline-loss, proximity, par>manhattan) apply as normal.
+ */
+async function runDark(eng, gen, count) {
+  const files = existingLevelFiles();
+  if (files.length === 0) throw new Error('no existing pack to extend; run `generate` first');
+
+  const existingSignatures = new Set();
+  let maxNum = 0;
+  for (const f of files) {
+    const spec = JSON.parse(readFileSync(join(LEVELS_DIR, f), 'utf8'));
+    existingSignatures.add(signature(spec));
+    const m = f.match(/^(\d+)-/);
+    if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+  }
+
+  const seed = (BASE_SEED ^ Math.imul(files.length + 0x0da2, 0x9e3779b1)) >>> 0;
+  const rng = mulberry32(seed);
+
+  const realWarn = console.warn;
+  console.warn = () => {};
+
+  const rows = [];
+  const t0 = Date.now();
+  try {
+    for (let produced = 0; produced < count; produced++) {
+      const levelIndex = maxNum + produced; // 0-based global play index
+      const num = String(maxNum + 1 + produced).padStart(2, '0');
+      const name = `Dark ${produced + 1}`;
+      const id = `${num}-${slugify(name)}`;
+      const plan = darkTierPlan(produced);
+
+      const cand = drawTierLevel(eng, gen, levelIndex, plan, id, name, rng, existingSignatures, DARK_FLOOR);
+      if (!cand) {
+        throw new Error(`dark: could not fill level ${num}; board too constrained`);
+      }
+
+      const spec = { ...cand.spec, id, name, dark: { radius: DARK_RADIUS } };
+      const { par, difficulty, check } = finalize(eng, gen, spec, levelIndex);
+      const finalSpec = { ...spec, par };
+      existingSignatures.add(signature(finalSpec));
+      writeSpec(num, finalSpec);
+      rows.push(rowFor(levelIndex, finalSpec, par, difficulty, check, `dark r${DARK_RADIUS} (${plan.size}x${plan.size})`));
+      realWarn(`  dark ${produced + 1}/${count}: ${id} par=${par} score=${difficulty.score.toFixed(1)}`);
+    }
+  } finally {
+    console.warn = realWarn;
+  }
+
+  rewriteIndex();
+  printTable(`Appended ${count} DARK level(s)`, rows);
+  assertPackInvariants(rows);
+  console.log(`\nDark pyramid generated in ${((Date.now() - t0) / 1000).toFixed(1)}s.\n`);
 }
 
 main().catch((err) => {

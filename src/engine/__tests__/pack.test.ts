@@ -12,16 +12,21 @@ import {
 import type { Action } from '../types';
 
 /**
- * With a large pack (170 levels / 17 pyramids), fully solving EVERY level on
+ * With a large pack (180 levels / 18 pyramids), fully solving EVERY level on
  * every test run is far too slow. Instead we verify the pack invariants on a
  * representative SAMPLE — the base and apex of every pyramid plus a fixed
  * pseudo-random subset — which is fast yet still exercises the full difficulty
  * range. (The generator script fully verifies every level at build time; this
  * suite guards against regressions.)
+ *
+ * The final pyramid is the DARK/flashlight tier (SPEC §2.7): view-only darkness
+ * over deliberately EASIER layouts, so those levels are exempt from the
+ * difficulty-ramp ceiling below (their challenge is the darkness, which
+ * scoreDifficulty does not measure).
  */
 const PYRAMID_SIZE = 10;
-const EXPECTED_LEVELS = 170;
-const EXPECTED_PYRAMIDS = 17;
+const EXPECTED_LEVELS = 180;
+const EXPECTED_PYRAMIDS = 18;
 
 /** Deterministic seeded PRNG (mulberry32) for the reproducible subset. */
 function mulberry32(seed: number): () => number {
@@ -122,8 +127,28 @@ describe('difficulty ramp', () => {
     const handMax = Math.max(...LEVELS.slice(0, 9).map((l) => scoreDifficulty(l, CAP).score));
     for (const idx of SAMPLE_INDICES) {
       if (idx < 9) continue;
+      // Dark levels are intentionally easier on raw solvability (SPEC §2.7).
+      if (LEVELS[idx].dark) continue;
       const score = scoreDifficulty(LEVELS[idx], CAP).score;
       expect(score).toBeGreaterThanOrEqual(handMax);
     }
+  });
+});
+
+describe('dark pyramid (flashlight tier, SPEC §2.7)', () => {
+  it('the final pyramid is entirely dark and themed as such', () => {
+    const last = PYRAMIDS[PYRAMIDS.length - 1];
+    const ids = last.rows.flat();
+    expect(ids.length).toBe(PYRAMID_SIZE);
+    for (const id of ids) {
+      const lvl = LEVELS.find((l) => l.id === id);
+      expect(lvl?.dark?.radius).toBeGreaterThan(0);
+    }
+    expect(last.name).toBe('The Lightless Vault');
+  });
+
+  it('no non-dark level carries a dark flag', () => {
+    const darkCount = LEVELS.filter((l) => l.dark).length;
+    expect(darkCount).toBe(PYRAMID_SIZE);
   });
 });

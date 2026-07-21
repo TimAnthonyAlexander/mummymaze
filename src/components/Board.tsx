@@ -1,6 +1,7 @@
 import { Key, Skull } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import type { Dir, Level, Pos } from '../engine';
+import { isLit } from '../game/flashlight';
 import type { RenderState } from '../game/render';
 import { ExplorerSprite, MonsterSprite } from './sprites/CharacterSprites';
 import './Board.css';
@@ -179,6 +180,21 @@ export function Board({ level, render, cellSize }: BoardProps) {
   const markerSize = Math.round(cell * 0.46);
   const charSize = Math.round(cell * 0.82);
   const walls = computeWallSegments(level);
+
+  // Dark levels (SPEC §2.7): a torchlight overlay that follows the explorer.
+  // View-only — the engine never sees this. Light is centred on the explorer's
+  // current (animating) render position so the pool glides with the sprite.
+  const dark = level.dark;
+  const lightStyle: CSSProperties | undefined = dark
+    ? ({
+        '--light-x': `${(render.player.x + 0.5) * cell}px`,
+        '--light-y': `${(render.player.y + 0.5) * cell}px`,
+        '--light-r': `${dark.radius * cell}px`,
+        '--light-r2': `${(dark.radius + 1.1) * cell}px`,
+        width: cell * level.width,
+        height: cell * level.height,
+      } as CSSProperties)
+    : undefined;
   // Lookup of every drawn wall segment, so wallStyle can close corner gaps.
   const hSet = new Set<string>();
   const vSet = new Set<string>();
@@ -252,17 +268,49 @@ export function Board({ level, render, cellSize }: BoardProps) {
         {/* Real opening in the border wall the explorer walks out through. */}
         <ExitOpening pos={level.exit.pos} dir={level.exit.dir} cell={cell} />
 
-        {/* Monsters — each turns to face the player it is hunting. */}
+        {/* Dark levels: black torchlight overlay above walls/exit, below sprites,
+            with a soft circular hole tracking the explorer. Plus a faint exit
+            beacon so the goal direction is always sensed through the dark. */}
+        {dark && (
+          <>
+            <div className="board__dark" style={lightStyle} />
+            <div
+              className="exit-beacon"
+              style={spriteStyle(level.exit.pos, cell)}
+              aria-hidden="true"
+            />
+          </>
+        )}
+
+        {/* Monsters — each turns to face the player it is hunting. In the dark,
+            a monster outside the torchlight shows only as faint glowing eyes. */}
         {render.monsters
           .filter((m) => m.alive)
-          .map((m) => (
-            <div key={m.id} className="sprite sprite--monster" style={spriteStyle(m.pos, cell)}>
-              <span className="sprite__shadow" />
-              <span className="sprite__body" style={mirrorStyle(faceToward(m.pos, render.player))}>
-                <MonsterSprite kind={m.kind} size={charSize} />
-              </span>
-            </div>
-          ))}
+          .map((m) => {
+            const lit = !dark || isLit(render.player, m.pos, dark.radius);
+            const facing = mirrorStyle(faceToward(m.pos, render.player));
+            return (
+              <div
+                key={m.id}
+                className={`sprite sprite--monster${lit ? '' : ' sprite--eyes'}`}
+                style={spriteStyle(m.pos, cell)}
+              >
+                {lit ? (
+                  <>
+                    <span className="sprite__shadow" />
+                    <span className="sprite__body" style={facing}>
+                      <MonsterSprite kind={m.kind} size={charSize} />
+                    </span>
+                  </>
+                ) : (
+                  <span className="dark-eyes" style={facing}>
+                    <span className="dark-eye" />
+                    <span className="dark-eye" />
+                  </span>
+                )}
+              </div>
+            );
+          })}
 
         {/* Explorer — faces its last move direction. */}
         <div

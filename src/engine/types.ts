@@ -56,6 +56,16 @@ export interface Exit {
   readonly dir: Dir;
 }
 
+/**
+ * Flashlight/darkness config for a "dark" level (see docs/SPEC.md §2.7).
+ * View-only: the engine never reads this — darkness hides information from the
+ * player but changes no rule, so a dark level and its lit twin simulate
+ * identically. `radius` is the torchlight radius in tiles.
+ */
+export interface DarkConfig {
+  readonly radius: number;
+}
+
 /** Fully-expanded, validated, runtime-ready level. */
 export interface Level {
   readonly id: string;
@@ -70,6 +80,8 @@ export interface Level {
   readonly monstersStart: readonly Monster[];
   /** Optional known-good move count for scoring. */
   readonly par?: number;
+  /** If set, a flashlight/dark level (§2.7). View-only; never read by the engine. */
+  readonly dark?: DarkConfig;
 }
 
 export type Phase = 'player' | 'won' | 'lost';

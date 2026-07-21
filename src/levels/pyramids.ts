@@ -90,6 +90,14 @@ function themedName(n: number): string {
   return `${adj} ${noun}`;
 }
 
+/** Display name for a pyramid whose every level is a dark/flashlight level. */
+const DARK_PYRAMID_NAME = 'The Lightless Vault';
+
+/** True if every id in the chunk is a dark (flashlight) level. */
+function chunkIsDark(ids: readonly string[]): boolean {
+  return ids.length > 0 && ids.every((id) => !!getLevel(id)?.dark);
+}
+
 /** Split a flat list of ids into rows following {@link ROW_SHAPE}. */
 function toRows(ids: readonly string[]): string[][] {
   const rows: string[][] = [];
@@ -125,9 +133,12 @@ function buildPyramids(): Pyramid[] {
       p === 0
         ? chunk
         : [...chunk].sort((a, b) => parOf(a) - parOf(b) || registryIndex(a) - registryIndex(b));
+    const name = chunkIsDark(chunk)
+      ? DARK_PYRAMID_NAME
+      : (PYRAMID_NAMES[p] ?? `Tomb ${p + 1}`);
     pyramids.push({
       id: `pyramid-${p + 1}`,
-      name: PYRAMID_NAMES[p] ?? `Tomb ${p + 1}`,
+      name,
       rows: toRows(ordered),
     });
   }
