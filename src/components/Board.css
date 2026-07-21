@@ -167,6 +167,31 @@
   opacity: 0.18;
 }
 
+/* ── Planning annotations (right-click arrows, chess.com-style) ────────────
+   A single SVG over the whole grid, above the sprites (and the dark overlay),
+   that captures right-drag input and draws blue arrows / square highlights. */
+.board-annotations {
+  --annot-blue: #2f74e0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 8;
+  /* Right-drag must not scroll or select; left/right presses are handled in JS. */
+  touch-action: none;
+  filter: drop-shadow(0 1px 2px rgba(10, 20, 40, 0.5));
+}
+.annot-arrow line {
+  stroke: var(--annot-blue);
+}
+.annot-arrow polygon {
+  fill: var(--annot-blue);
+}
+.annot-highlight {
+  fill: var(--annot-blue);
+  fill-opacity: 0.2;
+  stroke: var(--annot-blue);
+}
+
 /* ── Dark / flashlight levels (SPEC §2.7) ──────────────────────────────────
    A near-opaque warm-black overlay sitting ABOVE the walls/exit (z 4) but BELOW
    the sprites (z 6/7), with a soft circular hole punched at the explorer. Only

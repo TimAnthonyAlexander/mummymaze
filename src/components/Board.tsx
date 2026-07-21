@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import type { Dir, Level, Pos } from '../engine';
 import { isLit } from '../game/flashlight';
 import type { RenderState } from '../game/render';
+import { BoardAnnotations } from './BoardAnnotations';
 import { ExplorerSprite, MonsterSprite } from './sprites/CharacterSprites';
 import './Board.css';
 
@@ -322,6 +323,9 @@ export function Board({ level, render, cellSize }: BoardProps) {
             <ExplorerSprite size={charSize} />
           </span>
         </div>
+
+        {/* Chess.com-style planning arrows (right-click-drag). UI only. */}
+        <BoardAnnotations cell={cell} width={level.width} height={level.height} levelId={level.id} />
       </div>
     </div>
   );
