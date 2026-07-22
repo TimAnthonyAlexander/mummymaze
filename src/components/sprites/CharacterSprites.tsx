@@ -64,9 +64,16 @@ export function ExplorerSprite({ size = 48, className }: SpriteProps) {
       <rect x="15.5" y="40" width="8.5" height="8.5" rx="2.2" fill="#6b4a24" stroke="#4a3216" strokeWidth="1" />
 
       {/* ── arms (cylinders) at the sides, foreshortened SHORT toward us ── */}
+      {/* shadow the arms cast onto the torso for separation */}
+      <ellipse cx="22.5" cy="41" rx="4" ry="2.3" fill="#241505" opacity="0.32" />
+      <ellipse cx="41.5" cy="41" rx="4" ry="2.3" fill="#241505" opacity="0.36" />
       <line x1="21.5" y1="25" x2="21.5" y2="39" stroke={khaki} strokeWidth="6.2" strokeLinecap="round" />
       <line x1="42.5" y1="25" x2="42.5" y2="39" stroke={khakiSh} strokeWidth="6.2" strokeLinecap="round" />
-      <line x1="20.3" y1="26" x2="20.3" y2="38" stroke={khakiLt} strokeWidth="2.1" strokeLinecap="round" opacity="0.85" />
+      {/* lit OUTER edge + dark INNER seam so the arms read in front of the torso */}
+      <line x1="20.1" y1="26" x2="20.1" y2="38" stroke={khakiLt} strokeWidth="2.6" strokeLinecap="round" />
+      <line x1="41.4" y1="26" x2="41.4" y2="38" stroke={khaki} strokeWidth="2.2" strokeLinecap="round" opacity="0.9" />
+      <line x1="24.3" y1="26" x2="24.3" y2="38" stroke="#241505" strokeWidth="2" strokeLinecap="round" opacity="0.42" />
+      <line x1="39.7" y1="26" x2="39.7" y2="38" stroke="#241505" strokeWidth="2.2" strokeLinecap="round" opacity="0.46" />
       {/* fists at the near ends */}
       <ellipse cx="21.5" cy="39.5" rx="3.6" ry="3" fill={khaki} />
       <ellipse cx="42.5" cy="39.5" rx="3.6" ry="3" fill={khakiSh} />
@@ -146,19 +153,24 @@ export function MummySprite({
       {/* ── arms thrust straight FORWARD, hung off the SHOULDERS: foreshortened,
             so they are SHORT stubs pointing down in 2D, out at the shoulder line
             and ending in fists — well clear of the legs ── */}
-      {/* cast shadow of each fist on the torso, to push the arms toward us */}
-      <ellipse cx="21" cy="36.5" rx="4.2" ry="2.3" fill="#20160c" opacity="0.3" />
-      <ellipse cx="43" cy="36.5" rx="4.2" ry="2.3" fill="#20160c" opacity="0.34" />
+      {/* soft shadow each arm casts down onto the torso — lifts it toward us */}
+      <ellipse cx="22" cy="37" rx="4.8" ry="2.7" fill="#1a0f07" opacity="0.36" />
+      <ellipse cx="42" cy="37" rx="4.8" ry="2.7" fill="#1a0f07" opacity="0.4" />
       {/* short forearm cylinders, springing from the shoulder tops */}
       <line x1="21" y1="23" x2="21" y2="34" stroke={base} strokeWidth="7.2" strokeLinecap="round" />
       <line x1="43" y1="23" x2="43" y2="34" stroke={shade} strokeWidth="7.2" strokeLinecap="round" />
-      <line x1="19.6" y1="24" x2="19.6" y2="33" stroke={light} strokeWidth="2.5" strokeLinecap="round" opacity="0.85" />
-      <line x1="41.7" y1="24" x2="41.7" y2="33" stroke={base} strokeWidth="2.2" strokeLinecap="round" opacity="0.7" />
+      {/* lit OUTER edge (arms catch the key light) so they sit in front... */}
+      <line x1="19.3" y1="24.5" x2="19.3" y2="33" stroke={light} strokeWidth="3" strokeLinecap="round" />
+      <line x1="41.2" y1="24.5" x2="41.2" y2="33" stroke={base} strokeWidth="2.6" strokeLinecap="round" opacity="0.9" />
+      {/* ...and a dark INNER seam where each arm overlaps the torso (separation) */}
+      <line x1="24.4" y1="24.5" x2="24.4" y2="33.5" stroke="#1a0f07" strokeWidth="2" strokeLinecap="round" opacity="0.45" />
+      <line x1="39.6" y1="24.5" x2="39.6" y2="33.5" stroke="#1a0f07" strokeWidth="2.3" strokeLinecap="round" opacity="0.5" />
       {/* fists — the near end seen head-on (a knuckled cap, not a floating disc) */}
       <ellipse cx="21" cy="34.5" rx="4.3" ry="3.6" fill={base} />
       <ellipse cx="43" cy="34.5" rx="4.3" ry="3.6" fill={shade} />
-      <g stroke={band} strokeWidth="0.8" opacity="0.55" strokeLinecap="round">
-        <path d="M19.1 34.5 L22.9 34.5 M21 32.6 L21 36.4 M41.1 34.5 L44.9 34.5 M43 32.6 L43 36.4" />
+      <ellipse cx="19.7" cy="33.3" rx="1.7" ry="1.3" fill={light} opacity="0.75" />
+      <g stroke={band} strokeWidth="0.8" opacity="0.5" strokeLinecap="round">
+        <path d="M19.1 34.5 L22.9 34.5 M41.1 34.5 L44.9 34.5" />
       </g>
 
       {/* ── bandage wraps across everything (groove + a lit upper edge) ── */}
