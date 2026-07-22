@@ -4,9 +4,7 @@ import { Box, Typography } from '@mui/material';
 import { ArrowLeft } from 'lucide-react';
 import { PYRAMIDS, getPyramidOfLevel } from '../levels/pyramids';
 import { useProgress } from '../game/useProgress';
-import { loadSave } from '../game/storage';
 import { boardTextures } from '../game/textures';
-import { LEVELS } from '../levels';
 import { WorldTrail } from '../components/map/WorldTrail';
 
 const STONE_VARS = {
@@ -25,12 +23,13 @@ export function MapPage() {
   const active = (currentId && getPyramidOfLevel(currentId)) || PYRAMIDS[0];
   const activeIndex = Math.max(0, PYRAMIDS.findIndex((p) => p.id === active.id));
 
-  const onSelect = useCallback((id: string) => navigate(`/play/${id}`), [navigate]);
-
-  // "Back to game" resumes where you were, falling back to the current objective.
-  const lastId = loadSave().lastPlayedLevelId;
-  const backTo =
-    (lastId && LEVELS.some((l) => l.id === lastId) && lastId) || currentId || LEVELS[0].id;
+  // Picking a level carries it in ephemeral navigation state (not the URL); the
+  // game reads state.levelId. "Back to game" clears it, so the game falls back to
+  // the current objective from localStorage.
+  const onSelect = useCallback(
+    (id: string) => navigate('/play', { state: { levelId: id } }),
+    [navigate],
+  );
 
   return (
     <Box style={STONE_VARS} sx={{ position: 'fixed', inset: 0, overflow: 'hidden', bgcolor: '#14100a' }}>
@@ -64,7 +63,7 @@ export function MapPage() {
           type="button"
           className="stone-btn stone-btn--sm"
           style={{ width: 'auto', pointerEvents: 'auto' }}
-          onClick={() => navigate(`/play/${backTo}`)}
+          onClick={() => navigate('/play')}
         >
           <ArrowLeft size={16} />
           Back to game

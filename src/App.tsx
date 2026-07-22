@@ -1,36 +1,21 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { LEVELS, getLevel } from './levels';
-import { currentObjectiveId } from './levels/pyramids';
 import { GamePage } from './pages/GamePage';
 import { MapPage } from './pages/MapPage';
 import { EditorPage } from './pages/EditorPage';
 import { PlaytestPage } from './pages/PlaytestPage';
-import { loadSave } from './game/storage';
 
-/**
- * Resolve the initial route to the CURRENT OBJECTIVE — the first not-yet-cleared
- * level in progression order (the same frontier the world map marks) — so opening
- * the game always drops you where you actually are. Falls back to the last-played
- * level, then level 1 (e.g. once the whole pack is cleared).
- */
-function initialLevelId(): string {
-  const objective = currentObjectiveId(new Set(loadSave().completedLevelIds));
-  if (objective) return objective;
-  const lastId = loadSave().lastPlayedLevelId;
-  if (lastId && getLevel(lastId)) return lastId;
-  return LEVELS[0].id;
-}
-
+// The level is NEVER in the URL — GamePage resolves it from localStorage (the
+// current objective) or from ephemeral navigation state set when picking a level
+// on the map. So there is a single `/play` route with no level id.
 export default function App() {
-  const startId = initialLevelId();
   return (
     <Routes>
-      <Route path="/" element={<Navigate to={`/play/${startId}`} replace />} />
-      <Route path="/play/:levelId" element={<GamePage />} />
+      <Route path="/" element={<Navigate to="/play" replace />} />
+      <Route path="/play" element={<GamePage />} />
       <Route path="/map" element={<MapPage />} />
       <Route path="/editor" element={<EditorPage />} />
       <Route path="/playtest" element={<PlaytestPage />} />
-      <Route path="*" element={<Navigate to={`/play/${LEVELS[0].id}`} replace />} />
+      <Route path="*" element={<Navigate to="/play" replace />} />
     </Routes>
   );
 }

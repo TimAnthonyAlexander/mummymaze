@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Box, Button, Stack, Typography, useMediaQuery } from '@mui/material';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Box, useMediaQuery } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
-import { Home } from 'lucide-react';
 import type { Action } from '../engine';
 import { LEVELS, getLevel } from '../levels';
 import { PYRAMIDS, getPyramidOfLevel, nextInProgression } from '../levels/pyramids';
@@ -28,37 +27,43 @@ const KEY_MAP: Record<string, Action> = {
 };
 
 export function GamePage() {
-  const { levelId = '' } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const level = getLevel(levelId);
-
-  // Hooks must run unconditionally; guard the render below.
-  const game = useAnimatedGame(level ?? LEVELS[0]);
-  const { state, render, animating, move, undo, restart, load } = game;
 
   const progress = useProgress();
-  const { isUnlocked, recordWin, setLastPlayed } = progress;
+  const { isUnlocked, recordWin, currentLevelId } = progress;
+
+  // The level to play is NOT in the URL. It comes from localStorage — the current
+  // OBJECTIVE, derived from completed levels — by default, or from ephemeral
+  // navigation state when a specific past/current level was picked on the map.
+  // Capture the objective once per mount so a win (which advances the objective)
+  // never swaps the board out from under the win screen; explicit navigation
+  // (select / next) supplies a fresh levelId in location.state.
+  const mountObjective = useRef(currentLevelId ?? LEVELS[0].id);
+  const navLevelId = (location.state as { levelId?: string } | null)?.levelId;
+  const activeId =
+    navLevelId && getLevel(navLevelId) && isUnlocked(navLevelId)
+      ? navLevelId
+      : mountObjective.current;
+  const level = getLevel(activeId) ?? LEVELS[0];
+
+  const game = useAnimatedGame(level);
+  const { state, render, animating, move, undo, restart, load } = game;
 
   const hints = useHints(state);
   const { moveArrows } = useSettings();
 
-  // Reload engine when the route's level changes.
+  // Load the engine when the active level changes (select / next).
   useEffect(() => {
-    if (level && state.level.id !== level.id) load(level);
+    if (state.level.id !== level.id) load(level);
   }, [level, state.level.id, load]);
-
-  // Remember the last-played level whenever a (valid) level loads.
-  useEffect(() => {
-    if (level) setLastPlayed(level.id);
-  }, [level, setLastPlayed]);
 
   // Record a win exactly once per win. The ref key ties the guard to the
   // specific level+moveCount so re-renders and animation frames can't double-fire.
   const recordedWinRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!level) return;
     if (state.phase !== 'won' || state.level.id !== level.id) return;
     const key = `${level.id}:${state.moveCount}`;
     if (recordedWinRef.current === key) return;
@@ -66,10 +71,10 @@ export function GamePage() {
     recordWin(level.id, state.moveCount);
   }, [level, state.phase, state.level.id, state.moveCount, recordWin]);
 
-  // Reset the win guard when navigating to a different level.
+  // Reset the win guard when the active level changes.
   useEffect(() => {
     recordedWinRef.current = null;
-  }, [level?.id]);
+  }, [level.id]);
 
   // Live "Enter" handler for the end-of-level screen, kept in a ref so the
   // key listener (subscribed once) always sees the current phase/level/next.
@@ -78,10 +83,9 @@ export function GamePage() {
   const onEnterRef = useRef<() => void>(() => {});
   useEffect(() => {
     onEnterRef.current = () => {
-      if (!level) return;
       if (state.phase === 'won') {
         const nxt = nextInProgression(level.id);
-        if (nxt) navigate(`/play/${nxt}`);
+        if (nxt) navigate('/play', { state: { levelId: nxt } });
       } else if (state.phase === 'lost') {
         restart();
       }
@@ -119,21 +123,11 @@ export function GamePage() {
   const selectLevel = useCallback(
     (id: string) => {
       if (!isUnlocked(id)) return; // locked levels are non-navigable
-      navigate(`/play/${id}`);
+      // The chosen level rides in ephemeral navigation state, not the URL.
+      navigate('/play', { state: { levelId: id } });
     },
     [navigate, isUnlocked],
   );
-
-  if (!level) {
-    return (
-      <Stack spacing={2} sx={{ alignItems: 'center', mt: 8 }}>
-        <Typography variant="h5">Unknown level: {levelId}</Typography>
-        <Button startIcon={<Home />} onClick={() => navigate(`/play/${LEVELS[0].id}`)}>
-          Go to first level
-        </Button>
-      </Stack>
-    );
-  }
 
   const next = nextInProgression(level.id);
   const pyramid = getPyramidOfLevel(level.id) ?? PYRAMIDS[0];
@@ -145,7 +139,7 @@ export function GamePage() {
       <MobileShell
         pyramid={pyramid}
         pyramidProgress={pyramidProgress}
-        currentId={progress.currentLevelId ?? level.id}
+        currentId={level.id}
         state={state}
         render={render}
         canUndo={game.canUndo}
@@ -163,7 +157,7 @@ export function GamePage() {
         onMove={move}
         onUndo={undo}
         onRestart={restart}
-        onNext={() => next && navigate(`/play/${next}`)}
+        onNext={() => next && navigate('/play', { state: { levelId: next } })}
         onHint={hints.requestHint}
         onShowSolution={hints.showSolution}
       />
@@ -175,7 +169,7 @@ export function GamePage() {
       <Sidebar
         pyramid={pyramid}
         pyramidProgress={pyramidProgress}
-        currentId={progress.currentLevelId ?? level.id}
+        currentId={level.id}
         state={state}
         canUndo={game.canUndo}
         animating={animating}
@@ -202,7 +196,7 @@ export function GamePage() {
         moveArrows={moveArrows}
         onMove={move}
         onRestart={restart}
-        onNext={() => next && navigate(`/play/${next}`)}
+        onNext={() => next && navigate('/play', { state: { levelId: next } })}
       />
     </Box>
   );

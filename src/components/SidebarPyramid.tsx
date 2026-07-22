@@ -33,9 +33,11 @@ export function SidebarPyramid({
   const numberOf = (id: string) => flatBaseToApex.indexOf(id) + 1;
 
   const stateOf = (id: string): BlockState => {
-    // Completed wins outright, so a completed level is never mislabelled current.
-    if (completed.has(id)) return 'completed';
+    // In the sidebar, currentId is the level you're PLAYING — mark it "current"
+    // (the explorer head = you are here) even when it's a completed replay, so you
+    // always see which level you're in. Other cleared levels stay 'completed'.
     if (id === currentId) return 'current';
+    if (completed.has(id)) return 'completed';
     if (!unlocked.has(id)) return 'locked';
     return 'available';
   };

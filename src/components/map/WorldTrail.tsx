@@ -149,8 +149,11 @@ export function WorldTrail({
         if (e.pointerType !== 'mouse' || e.button !== 0) return;
         const el = ref.current;
         if (!el) return;
+        // Record the potential drag but DO NOT capture the pointer yet: capturing
+        // on pointerdown makes Chrome retarget the ensuing click to this container,
+        // so a plain click on a tomb never reaches its onClick. Capture only once a
+        // real drag begins (below), so a stationary click selects the level.
         drag.current = { down: true, moved: false, sx: e.clientX, sy: e.clientY, sl: el.scrollLeft, st: el.scrollTop };
-        el.setPointerCapture(e.pointerId);
       }}
       onPointerMove={(e) => {
         const d = drag.current;
@@ -162,6 +165,11 @@ export function WorldTrail({
         if (!d.moved && Math.hypot(dx, dy) > 4) {
           d.moved = true;
           setGrabbing(true);
+          try {
+            el.setPointerCapture(e.pointerId); // capture only now that we're dragging
+          } catch {
+            /* capture may fail if the pointer already ended */
+          }
         }
         if (d.moved) {
           el.scrollLeft = d.sl - dx;
