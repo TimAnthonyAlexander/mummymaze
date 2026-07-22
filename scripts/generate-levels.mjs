@@ -214,13 +214,17 @@ const CURRICULUM = [
 // ===========================================================================
 const GEN_SLOTS = [
   {
+    // Pyramid 1's APEX (level 10): the first dark/flashlight level, so even the
+    // teaching pyramid ends in the dark. Board stays 8 so a radius-2 torch leaves
+    // most of it unseen.
     name: 'Ambush',
-    mechanic: 'Mummy + scorpion + a trap and a key on a bigger board',
+    mechanic: 'Mummy + scorpion + a trap and a key, in the dark',
     size: 8,
     monsters: ['mummy_white', 'scorpion_red'],
     wallDensity: 0.06,
     traps: 1,
     key: true,
+    dark: true,
   },
   {
     name: 'The Warren',
@@ -291,32 +295,53 @@ const EXTEND_CAP = 250_000;
 const EXTEND_FLOOR = 30;
 
 /**
- * Tier plan for a 0-based global play index (>= 20 for pyramid 3+). Returns the
- * board/monster/hazard parameters plus the target difficulty window centre.
+ * Tier plan for a 0-based global play index. Pyramid = floor(idx/10)+1 (1..18),
+ * pos = idx%10 (0 base .. 9 apex). Returns the board/monster/hazard parameters,
+ * the target difficulty window centre, a per-level difficulty FLOOR, and whether
+ * this level is the pyramid's dark apex.
+ *
+ * Two design rules the ramp encodes:
+ *   * BOARD SIZE climbs base->apex within every pyramid (fewer squares on the
+ *     lower rungs, biggest at the point) and drifts up gently per pyramid. This
+ *     echoes the original's 6/8/10 lattices and — because the apex is the biggest
+ *     board — keeps a radius-2 torch on the DARK apex mostly in the dark.
+ *   * Difficulty rises across pyramids and base->apex. The FLOOR is lenient so
+ *     small boards always fill; the dark apex is gentler (darkness is itself the
+ *     hazard) and is exempt from the pack's difficulty-ramp check.
  */
 function tierPlan(idx) {
-  const pyramid = Math.floor(idx / 10) + 1; // 3..20
+  const pyramid = Math.floor(idx / 10) + 1; // 1..18
   const pos = idx % 10; // 0 (base) .. 9 (apex)
   const t = pyramid;
+  const isApex = pos === 9;
 
-  // Boards grow GENTLY and stay capped at 12 (mostly 8..11).
-  const size = Math.min(12, 8 + Math.floor((t - 3) / 3)); // t3:8 .. t12:11 .. t15:12
+  // SIZE RAMP: fewer squares at the base, biggest at the apex; +0..+4 across the
+  // pyramid, base drifts up per tier. Capped at 12.
+  const baseSize = 6 + Math.floor(t / 4); // t1-3:6, t4-7:7, t8-11:8, t12-15:9, t16-18:10
+  const size = Math.min(12, baseSize + Math.round((pos * 4) / 9)); // base .. base+4
 
-  // Monsters rise gently, capped at 5.
-  const monsterCount = Math.min(5, 3 + Math.floor((t - 3) / 4)); // t3:3 t7:4 t11:5
+  // Monsters rise gently (capped 5); the dark apex stays lighter.
+  const litCount = Math.min(5, 2 + Math.floor((t - 1) / 4) + (pos >= 6 ? 1 : 0));
+  const monsterCount = isApex ? Math.min(3, 1 + Math.floor((t - 1) / 6)) : litCount;
   const monsters = [];
   for (let j = 0; j < monsterCount; j++) {
     monsters.push(KIND_ROTATION[(idx + j) % KIND_ROTATION.length]);
   }
+  // Guarantee a FAST mummy so the beeline-loss filter is achievable (a lone slow
+  // scorpion often can't catch a naive walker, stalling generation).
+  if (!monsters.some((k) => k.startsWith('mummy'))) {
+    monsters[0] = idx % 2 === 0 ? 'mummy_white' : 'mummy_red';
+  }
 
   // Primary difficulty levers: walls + traps + a key/gate (fast, high-tension).
-  const wallDensity = Math.min(0.16, 0.08 + 0.005 * (t - 3) + 0.004 * pos);
-  const traps = Math.min(5, 1 + Math.floor((t - 3) / 3) + Math.floor(pos / 5));
+  const wallDensity = Math.min(0.16, 0.05 + 0.006 * (t - 1) + 0.004 * pos);
+  const traps = Math.min(5, Math.floor((t - 1) / 3) + Math.floor(pos / 4));
 
-  // Gently rising difficulty window: base drifts +1.1/tier, +~0.67/step inside.
-  const center = 40 + (t - 3) * 1.1 + pos * (6 / 9);
+  // Gently rising difficulty window and a lenient floor (small boards fill).
+  const center = 14 + (t - 1) * 2.2 + pos * 1.8;
+  const floor = isApex ? 8 : 12;
 
-  return { pyramid, pos, size, monsters, wallDensity, traps, center };
+  return { pyramid, pos, size, monsters, wallDensity, traps, center, floor, dark: isApex };
 }
 
 // ===========================================================================
@@ -714,7 +739,7 @@ async function runGenerate(eng, gen) {
     const cand = drawCurriculumRising(eng, gen, opts, index, rng, prevDiff, existingSignatures);
     if (!cand) throw new Error(`failed to generate a curriculum-passing level for slot ${num} (${slot.name})`);
 
-    const spec = { ...cand.spec, id, name: slot.name };
+    const spec = { ...cand.spec, id, name: slot.name, ...(slot.dark ? { dark: { radius: DARK_RADIUS } } : {}) };
     const { par, difficulty, check } = finalize(eng, gen, spec, index);
     const finalSpec = { ...spec, par };
     existingSignatures.add(signature(finalSpec));
@@ -773,7 +798,7 @@ async function runExtend(eng, gen, count) {
         );
       }
 
-      const cand = drawTierLevel(eng, gen, levelIndex, plan, id, name, rng, existingSignatures);
+      const cand = drawTierLevel(eng, gen, levelIndex, plan, id, name, rng, existingSignatures, plan.floor);
       if (!cand) {
         throw new Error(
           `extend: could not fill level ${num} (pyramid ${plan.pyramid}); ` +
@@ -781,7 +806,10 @@ async function runExtend(eng, gen, count) {
         );
       }
 
-      const spec = { ...cand.spec, id, name };
+      // The apex (pos 9) of every pyramid is a DARK/flashlight level: climbing a
+      // pyramid ends in the dark. Darkness is view-only, so the same solvability
+      // filters already passed above still hold.
+      const spec = { ...cand.spec, id, name, ...(plan.dark ? { dark: { radius: DARK_RADIUS } } : {}) };
       const { par, difficulty, check } = finalize(eng, gen, spec, levelIndex);
       const finalSpec = { ...spec, par };
       existingSignatures.add(signature(finalSpec));

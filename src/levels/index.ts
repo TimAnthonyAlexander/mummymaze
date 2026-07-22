@@ -178,16 +178,16 @@ import lvl_167_trial_167 from './167-trial-167.json';
 import lvl_168_trial_168 from './168-trial-168.json';
 import lvl_169_trial_169 from './169-trial-169.json';
 import lvl_170_trial_170 from './170-trial-170.json';
-import lvl_171_dark_1 from './171-dark-1.json';
-import lvl_172_dark_2 from './172-dark-2.json';
-import lvl_173_dark_3 from './173-dark-3.json';
-import lvl_174_dark_4 from './174-dark-4.json';
-import lvl_175_dark_5 from './175-dark-5.json';
-import lvl_176_dark_6 from './176-dark-6.json';
-import lvl_177_dark_7 from './177-dark-7.json';
-import lvl_178_dark_8 from './178-dark-8.json';
-import lvl_179_dark_9 from './179-dark-9.json';
-import lvl_180_dark_10 from './180-dark-10.json';
+import lvl_171_trial_171 from './171-trial-171.json';
+import lvl_172_trial_172 from './172-trial-172.json';
+import lvl_173_trial_173 from './173-trial-173.json';
+import lvl_174_trial_174 from './174-trial-174.json';
+import lvl_175_trial_175 from './175-trial-175.json';
+import lvl_176_trial_176 from './176-trial-176.json';
+import lvl_177_trial_177 from './177-trial-177.json';
+import lvl_178_trial_178 from './178-trial-178.json';
+import lvl_179_trial_179 from './179-trial-179.json';
+import lvl_180_trial_180 from './180-trial-180.json';
 
 const SPECS: LevelSpec[] = [
   lvl_01_the_chase as LevelSpec,
@@ -360,16 +360,16 @@ const SPECS: LevelSpec[] = [
   lvl_168_trial_168 as LevelSpec,
   lvl_169_trial_169 as LevelSpec,
   lvl_170_trial_170 as LevelSpec,
-  lvl_171_dark_1 as LevelSpec,
-  lvl_172_dark_2 as LevelSpec,
-  lvl_173_dark_3 as LevelSpec,
-  lvl_174_dark_4 as LevelSpec,
-  lvl_175_dark_5 as LevelSpec,
-  lvl_176_dark_6 as LevelSpec,
-  lvl_177_dark_7 as LevelSpec,
-  lvl_178_dark_8 as LevelSpec,
-  lvl_179_dark_9 as LevelSpec,
-  lvl_180_dark_10 as LevelSpec,
+  lvl_171_trial_171 as LevelSpec,
+  lvl_172_trial_172 as LevelSpec,
+  lvl_173_trial_173 as LevelSpec,
+  lvl_174_trial_174 as LevelSpec,
+  lvl_175_trial_175 as LevelSpec,
+  lvl_176_trial_176 as LevelSpec,
+  lvl_177_trial_177 as LevelSpec,
+  lvl_178_trial_178 as LevelSpec,
+  lvl_179_trial_179 as LevelSpec,
+  lvl_180_trial_180 as LevelSpec,
 ];
 
 /** Validated, runtime-ready levels in play order. */

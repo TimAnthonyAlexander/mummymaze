@@ -1,95 +1,69 @@
 {
   "id": "23-trial-23",
   "name": "Trial 23",
-  "width": 8,
-  "height": 8,
+  "width": 7,
+  "height": 7,
   "start": {
-    "x": 2,
-    "y": 3
+    "x": 4,
+    "y": 2
   },
   "exit": {
-    "x": 7,
-    "y": 6,
-    "dir": "E"
+    "x": 0,
+    "y": 0,
+    "dir": "N"
   },
   "walls": [
     {
       "x": 3,
-      "y": 0,
-      "dir": "S"
+      "y": 1,
+      "dir": "E"
     },
     {
       "x": 2,
-      "y": 1,
-      "dir": "S"
-    },
-    {
-      "x": 5,
       "y": 2,
-      "dir": "S"
-    },
-    {
-      "x": 3,
-      "y": 3,
       "dir": "E"
     },
     {
       "x": 3,
-      "y": 3,
-      "dir": "S"
+      "y": 4,
+      "dir": "E"
     },
     {
-      "x": 7,
-      "y": 4,
+      "x": 2,
+      "y": 5,
       "dir": "S"
     },
     {
       "x": 5,
-      "y": 7,
-      "dir": "E"
-    },
-    {
-      "x": 6,
-      "y": 7,
+      "y": 6,
       "dir": "E"
     }
   ],
   "gates": [
     {
-      "x": 1,
-      "y": 4,
+      "x": 4,
+      "y": 6,
       "dir": "E",
       "open": false
     }
   ],
   "keys": [
     {
-      "x": 5,
-      "y": 6
-    }
-  ],
-  "traps": [
-    {
-      "x": 3,
-      "y": 6
+      "x": 6,
+      "y": 3
     }
   ],
   "monsters": [
     {
       "kind": "mummy_red",
-      "x": 2,
-      "y": 0
-    },
-    {
-      "kind": "scorpion_red",
-      "x": 4,
+      "x": 5,
       "y": 6
     },
     {
-      "kind": "scorpion_white",
-      "x": 4,
-      "y": 2
+      "kind": "scorpion_red",
+      "x": 5,
+      "y": 1
     }
   ],
-  "par": 19
+  "par": 7
 }

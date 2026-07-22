@@ -90,12 +90,9 @@ function themedName(n: number): string {
   return `${adj} ${noun}`;
 }
 
-/** Display name for a pyramid whose every level is a dark/flashlight level. */
-const DARK_PYRAMID_NAME = 'The Lightless Vault';
-
-/** True if every id in the chunk is a dark (flashlight) level. */
-function chunkIsDark(ids: readonly string[]): boolean {
-  return ids.length > 0 && ids.every((id) => !!getLevel(id)?.dark);
+/** True if a level is a dark/flashlight level. */
+function isDark(id: string): boolean {
+  return !!getLevel(id)?.dark;
 }
 
 /** Split a flat list of ids into rows following {@link ROW_SHAPE}. */
@@ -120,25 +117,30 @@ function parOf(id: string): number {
 }
 
 /**
- * Build the pyramids by chunking the flat registry into groups of ten. Pyramid 1
- * keeps its authoring (teaching) order; every later pyramid is ordered base→apex
- * by rising par (tiebreak: registry order).
+ * Build the pyramids by chunking the flat registry into groups of ten. Every
+ * pyramid's APEX (top rung) is its single dark/flashlight level, so dark levels
+ * always sort LAST regardless of par. Among the lit rungs, pyramid 1 keeps its
+ * authoring (teaching) order; every later pyramid is ordered base→apex by rising
+ * par (tiebreak: registry order).
  */
 function buildPyramids(): Pyramid[] {
   const pyramids: Pyramid[] = [];
   const count = Math.ceil(LEVELS.length / PYRAMID_SIZE);
   for (let p = 0; p < count; p++) {
     const chunk = LEVELS.slice(p * PYRAMID_SIZE, (p + 1) * PYRAMID_SIZE).map((l) => l.id);
-    const ordered =
-      p === 0
-        ? chunk
-        : [...chunk].sort((a, b) => parOf(a) - parOf(b) || registryIndex(a) - registryIndex(b));
-    const name = chunkIsDark(chunk)
-      ? DARK_PYRAMID_NAME
-      : (PYRAMID_NAMES[p] ?? `Tomb ${p + 1}`);
+    const ordered = [...chunk].sort((a, b) => {
+      // Dark level(s) always last → the apex. A dark apex is generated gentler
+      // (lower par), so par alone would wrongly sort it to the base.
+      const da = isDark(a) ? 1 : 0;
+      const db = isDark(b) ? 1 : 0;
+      if (da !== db) return da - db;
+      // Lit rungs: pyramid 1 keeps teaching order; others rise by par.
+      if (p === 0) return registryIndex(a) - registryIndex(b);
+      return parOf(a) - parOf(b) || registryIndex(a) - registryIndex(b);
+    });
     pyramids.push({
       id: `pyramid-${p + 1}`,
-      name,
+      name: PYRAMID_NAMES[p] ?? `Tomb ${p + 1}`,
       rows: toRows(ordered),
     });
   }

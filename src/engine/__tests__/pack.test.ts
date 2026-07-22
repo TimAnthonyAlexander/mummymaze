@@ -19,10 +19,11 @@ import type { Action } from '../types';
  * range. (The generator script fully verifies every level at build time; this
  * suite guards against regressions.)
  *
- * The final pyramid is the DARK/flashlight tier (SPEC §2.7): view-only darkness
- * over deliberately EASIER layouts, so those levels are exempt from the
- * difficulty-ramp ceiling below (their challenge is the darkness, which
- * scoreDifficulty does not measure).
+ * Every pyramid's APEX (top rung) is a DARK/flashlight level (SPEC §2.7):
+ * view-only darkness over a deliberately gentler layout, so the dark apexes are
+ * exempt from the difficulty-ramp check below (their challenge is the darkness,
+ * which scoreDifficulty does not measure). Board size also climbs base→apex
+ * within each pyramid (fewer squares on the lower rungs).
  */
 const PYRAMID_SIZE = 10;
 const EXPECTED_LEVELS = 180;
@@ -120,35 +121,42 @@ describe('curriculum quality filters (anti-trivial)', () => {
 });
 
 describe('difficulty ramp', () => {
-  it('every advanced level tops the hand-authored teaching levels', () => {
-    // A small flood cap keeps this fast; it clamps the reachable-states term but
-    // advanced levels still clear the teaching ceiling by a wide margin.
+  it('the back half of the pack is harder than the front half', () => {
+    // A small flood cap keeps this fast; it clamps the reachable-states term.
+    // Board size now climbs base→apex, so the base rungs of a pyramid are
+    // deliberately small/easy — a per-level "every advanced level tops the
+    // teaching ceiling" rule no longer holds. Instead assert the real trend:
+    // sampled LIT levels in the back half of the pack outscore the front half.
     const CAP = 30_000;
-    const handMax = Math.max(...LEVELS.slice(0, 9).map((l) => scoreDifficulty(l, CAP).score));
-    for (const idx of SAMPLE_INDICES) {
-      if (idx < 9) continue;
-      // Dark levels are intentionally easier on raw solvability (SPEC §2.7).
-      if (LEVELS[idx].dark) continue;
-      const score = scoreDifficulty(LEVELS[idx], CAP).score;
-      expect(score).toBeGreaterThanOrEqual(handMax);
-    }
+    const scoreOf = (i: number) => scoreDifficulty(LEVELS[i], CAP).score;
+    const lit = SAMPLE_INDICES.filter((i) => !LEVELS[i].dark);
+    const half = LEVELS.length / 2;
+    const early = lit.filter((i) => i < half).map(scoreOf);
+    const late = lit.filter((i) => i >= half).map(scoreOf);
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(late.length).toBeGreaterThan(0);
+    expect(early.length).toBeGreaterThan(0);
+    expect(mean(late)).toBeGreaterThan(mean(early));
   });
 });
 
-describe('dark pyramid (flashlight tier, SPEC §2.7)', () => {
-  it('the final pyramid is entirely dark and themed as such', () => {
-    const last = PYRAMIDS[PYRAMIDS.length - 1];
-    const ids = last.rows.flat();
-    expect(ids.length).toBe(PYRAMID_SIZE);
-    for (const id of ids) {
-      const lvl = LEVELS.find((l) => l.id === id);
-      expect(lvl?.dark?.radius).toBeGreaterThan(0);
+describe('dark apex per pyramid (flashlight, SPEC §2.7)', () => {
+  it('every pyramid ends on a dark apex', () => {
+    for (const p of PYRAMIDS) {
+      const flat = p.rows.flat();
+      const apex = LEVELS.find((l) => l.id === flat[flat.length - 1]);
+      expect(apex?.dark?.radius).toBeGreaterThan(0);
     }
-    expect(last.name).toBe('The Lightless Vault');
   });
 
-  it('no non-dark level carries a dark flag', () => {
+  it('exactly one dark level per pyramid, and only at the apex', () => {
     const darkCount = LEVELS.filter((l) => l.dark).length;
-    expect(darkCount).toBe(PYRAMID_SIZE);
+    expect(darkCount).toBe(EXPECTED_PYRAMIDS);
+    for (const p of PYRAMIDS) {
+      const flat = p.rows.flat();
+      for (const id of flat.slice(0, -1)) {
+        expect(LEVELS.find((l) => l.id === id)?.dark).toBeFalsy();
+      }
+    }
   });
 });
