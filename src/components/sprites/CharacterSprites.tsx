@@ -11,8 +11,6 @@
  * (duplicate ids in one document collide to the first match).
  */
 
-const OUTLINE = '#3a2817';
-
 interface SpriteProps {
   size?: number;
   className?: string;
@@ -20,61 +18,73 @@ interface SpriteProps {
 
 /** Explorer — pulp adventurer: pith helmet, muddy khaki, olive strap. */
 export function ExplorerSprite({ size = 48, className }: SpriteProps) {
+  // An upstanding, broad-shouldered man built from the same cylinder limbs as the
+  // mummy, so the cast reads as one set. Pith helmet, khaki, olive sash, boots.
   const khaki = '#b89a5f';
-  const khakiSh = '#8a7040';
-  const helm = '#ddd0ad';
-  const helmSh = '#b3a577';
-  const skin = '#d9a879';
-  const skinSh = '#b3835a';
-  const strap = '#5c7a4a';
+  const khakiLt = '#d3b981';
+  const khakiSh = '#836a3c';
+  const helm = '#d8cba2';
+  const helmLt = '#efe6c8';
+  const helmSh = '#a99b6f';
+  const skin = '#cf9f70';
+  const boot = '#4f3a20';
+  const sash = '#5c7a4a';
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" className={className} aria-label="explorer">
       <defs>
-        <radialGradient id="exp-torso" cx="34%" cy="28%" r="85%">
-          <stop offset="0%" stopColor="#d0b47e" />
-          <stop offset="55%" stopColor={khaki} />
+        <linearGradient id="exp-torso" x1="0.1" y1="0" x2="0.85" y2="1">
+          <stop offset="0%" stopColor={khakiLt} />
+          <stop offset="50%" stopColor={khaki} />
           <stop offset="100%" stopColor={khakiSh} />
-        </radialGradient>
-        <radialGradient id="exp-helm" cx="32%" cy="24%" r="90%">
-          <stop offset="0%" stopColor="#efe6c8" />
-          <stop offset="60%" stopColor={helm} />
+        </linearGradient>
+        <linearGradient id="exp-helm" x1="0.15" y1="0" x2="0.85" y2="1">
+          <stop offset="0%" stopColor={helmLt} />
+          <stop offset="55%" stopColor={helm} />
           <stop offset="100%" stopColor={helmSh} />
-        </radialGradient>
+        </linearGradient>
       </defs>
-      {/* boots */}
-      <ellipse cx="26.5" cy="55" rx="4.6" ry="3.1" fill="#5a4326" stroke={OUTLINE} strokeWidth="1.9" />
-      <ellipse cx="37.5" cy="55" rx="4.6" ry="3.1" fill="#4f3a20" stroke={OUTLINE} strokeWidth="1.9" />
-      {/* legs */}
-      <path d="M27 46 L26 53 M37 46 L38 53" stroke={khaki} strokeWidth="6.2" strokeLinecap="round" />
-      <path d="M37 46 L38 53" stroke={khakiSh} strokeWidth="3" strokeLinecap="round" />
-      {/* left arm */}
-      <path d="M22 34 Q17 39 18 45" stroke={khaki} strokeWidth="5.6" fill="none" strokeLinecap="round" />
-      <path d="M22 34 Q17 39 18 45" stroke={OUTLINE} strokeWidth="1.9" fill="none" strokeLinecap="round" opacity="0.4" />
-      {/* torso */}
-      <path d="M22 32 Q22 29 32 29 Q42 29 42 32 L43 47 Q32 51 21 47 Z" fill="url(#exp-torso)" stroke={OUTLINE} strokeWidth="2" strokeLinejoin="round" />
-      {/* olive cross-strap + satchel */}
-      <path d="M24 31 L41 46" stroke={strap} strokeWidth="3.4" strokeLinecap="round" />
-      <rect x="38.5" y="43" width="8.5" height="8" rx="2" fill="#6b4a24" stroke={OUTLINE} strokeWidth="1.8" />
-      {/* right arm */}
-      <path d="M42 33 Q47 36 47 41" stroke={khaki} strokeWidth="5.6" fill="none" strokeLinecap="round" />
-      <path d="M42 33 Q47 36 47 41" stroke={OUTLINE} strokeWidth="1.9" fill="none" strokeLinecap="round" opacity="0.4" />
-      {/* flashlight — OFF — aimed down-forward */}
-      <g transform="translate(47 41) rotate(52)">
-        <rect x="-1" y="-3" width="8" height="6" rx="2.2" fill="#b08f30" stroke={OUTLINE} strokeWidth="1.8" />
-        <path d="M7 -3.6 L11 -4.6 L11 4.6 L7 3.6 Z" fill="#8f7124" stroke={OUTLINE} strokeWidth="1.8" strokeLinejoin="round" />
+
+      {/* ── legs (cylinders) with dark boot caps ── */}
+      <line x1="28.5" y1="42" x2="28.5" y2="59" stroke={khaki} strokeWidth="7.4" strokeLinecap="round" />
+      <line x1="35.5" y1="42" x2="35.5" y2="59" stroke={khakiSh} strokeWidth="7.4" strokeLinecap="round" />
+      <line x1="27.2" y1="43" x2="27.2" y2="55" stroke={khakiLt} strokeWidth="2.3" strokeLinecap="round" opacity="0.8" />
+      <line x1="28.5" y1="56" x2="28.5" y2="60.5" stroke={boot} strokeWidth="8.4" strokeLinecap="round" />
+      <line x1="35.5" y1="56" x2="35.5" y2="60.5" stroke="#3f2e18" strokeWidth="8.4" strokeLinecap="round" />
+
+      {/* ── torso with broad shoulders ── */}
+      <path
+        d="M17 28 Q16 22 24 21 L40 21 Q48 22 47 28 L41 33 L39 45 Q32 48 25 45 L23 33 Z"
+        fill="url(#exp-torso)"
+      />
+      <path d="M18 27 Q24 22 32 22 Q40 22 46 27" fill="none" stroke={khakiLt} strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
+      <path d="M40 22 Q46 23 46 28 L40 33 L38.5 44 Q35 46 32 46 Z" fill={khakiSh} opacity="0.4" />
+      {/* olive cross-sash + satchel */}
+      <path d="M23 24 L40 44" stroke={sash} strokeWidth="3.6" strokeLinecap="round" />
+      <path d="M23 24 L40 44" stroke="#48633a" strokeWidth="1.3" strokeLinecap="round" opacity="0.7" />
+      <rect x="15.5" y="40" width="8.5" height="8.5" rx="2.2" fill="#6b4a24" stroke="#4a3216" strokeWidth="1" />
+
+      {/* ── arms (cylinders) at the sides ── */}
+      <line x1="21.5" y1="25" x2="21.5" y2="44" stroke={khaki} strokeWidth="6.2" strokeLinecap="round" />
+      <line x1="42.5" y1="25" x2="42.5" y2="44" stroke={khakiSh} strokeWidth="6.2" strokeLinecap="round" />
+      <line x1="20.3" y1="26" x2="20.3" y2="43" stroke={khakiLt} strokeWidth="2.1" strokeLinecap="round" opacity="0.85" />
+      {/* flashlight held in the right hand, aimed down-forward */}
+      <g transform="translate(43 45) rotate(38)">
+        <rect x="-1.5" y="-2.6" width="8" height="5.2" rx="2" fill="#b08f30" stroke="#7a5f1c" strokeWidth="1" />
+        <path d="M6.5 -3.2 L10.5 -4 L10.5 4 L6.5 3.2 Z" fill="#8f7124" stroke="#5f4a15" strokeWidth="1" strokeLinejoin="round" />
       </g>
-      {/* face */}
-      <path d="M25 24 Q25 31 32 31 Q39 31 39 24 Z" fill={skin} stroke={OUTLINE} strokeWidth="1.9" strokeLinejoin="round" />
-      <path d="M39 24 Q39 30 33 31 L33 24 Z" fill={skinSh} />
-      <circle cx="29.5" cy="26.5" r="1.5" fill={OUTLINE} />
-      <circle cx="35" cy="26.5" r="1.5" fill={OUTLINE} />
-      <path d="M29 29 Q32 31 35 29" stroke={OUTLINE} strokeWidth="1.3" fill="none" strokeLinecap="round" />
-      {/* pith helmet: brim + dome + knob */}
-      <ellipse cx="32" cy="22.5" rx="13.5" ry="4.6" fill="url(#exp-helm)" stroke={OUTLINE} strokeWidth="2" />
-      <path d="M20 22 Q20 11 32 11 Q44 11 44 22 Z" fill="url(#exp-helm)" stroke={OUTLINE} strokeWidth="2" strokeLinejoin="round" />
-      <path d="M18.6 23 Q32 27 45.4 23" stroke={helmSh} strokeWidth="1.6" fill="none" strokeLinecap="round" />
-      <circle cx="32" cy="10" r="2.1" fill={helm} stroke={OUTLINE} strokeWidth="1.8" />
-      <path d="M24 15 Q27 12 31 11.6" stroke="#f6efd9" strokeWidth="1.8" fill="none" strokeLinecap="round" opacity="0.8" />
+
+      {/* ── head: shadowed face under a wide pith helmet ── */}
+      <ellipse cx="32" cy="19.5" rx="5.6" ry="5.2" fill={skin} />
+      <path d="M32 15 Q37 16 37.5 20 Q37 24 32 24.5 Z" fill="#a67c4d" opacity="0.5" />
+      <circle cx="29.8" cy="20.2" r="1.4" fill="#2a1d10" />
+      <circle cx="34.2" cy="20.2" r="1.4" fill="#2a1d10" />
+      {/* wide brim casts a shadow over the eyes */}
+      <ellipse cx="32" cy="16.5" rx="12.5" ry="4" fill="url(#exp-helm)" />
+      <path d="M20 16.5 Q32 20 44 16.5" fill="none" stroke={helmSh} strokeWidth="1.4" strokeLinecap="round" opacity="0.8" />
+      {/* dome + knob */}
+      <path d="M23 16 Q23 7 32 7 Q41 7 41 16 Z" fill="url(#exp-helm)" />
+      <circle cx="32" cy="6.5" r="2" fill={helm} />
+      <path d="M25 12 Q28 8.6 32 8.3" fill="none" stroke={helmLt} strokeWidth="1.6" strokeLinecap="round" opacity="0.85" />
     </svg>
   );
 }
@@ -85,65 +95,88 @@ export function MummySprite({
   className,
   variant = 'white',
 }: SpriteProps & { variant?: 'white' | 'red' }) {
-  // Muddy, desaturated separation: warm bone vs a MUDDY terracotta (not a bright
-  // red). Eyes stay gold and bright so they read on both bodies.
+  // Muddy bone vs muddy terracotta; eyes stay bright gold on both. Every limb is
+  // a rounded-cap CYLINDER: base tube + a lit stripe down its upper-left edge.
   const isRed = variant === 'red';
-  const base = isRed ? '#b45a3e' : '#e2d7ba';
-  const light = isRed ? '#c9795c' : '#f2ead3';
-  const shade = isRed ? '#7d3826' : '#b3a578';
-  const band = isRed ? '#6f3020' : '#a4956a';
-  const eye = isRed ? '#ffd94b' : '#f0c445';
+  const base = isRed ? '#bb6349' : '#d9ccac';
+  const light = isRed ? '#d4886c' : '#f1e8cf';
+  const shade = isRed ? '#7c3826' : '#a5966a';
+  const band = isRed ? '#8a4531' : '#a99a6c';
+  const bandHi = isRed ? '#d98f75' : '#efe6cc';
+  const eye = isRed ? '#ffdc55' : '#ffd23f';
   const gid = `mum-body-${variant}`;
-  const cid = `mumclip-${variant}`;
-  const body =
-    'M32 14 C 44 14, 47 25, 46 34 C 45 47, 40 56, 32 56 C 24 56, 19 47, 18 34 C 17 25, 20 14, 32 14 Z';
+
+  // A standing wrapped MAN, high 3/4 view: broad shoulders, both arms straight
+  // out FORWARD (foreshortened cylinders pointing at us, the zombie reach), a
+  // barrel torso, two cylinder legs whose rounded ends are the feet. Light bakes
+  // from the top-left. Only the eyes show through the wrappings.
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" className={className} aria-label={`${variant} mummy`}>
       <defs>
-        <clipPath id={cid}>
-          <path d={body} />
-        </clipPath>
-        <radialGradient id={gid} cx="34%" cy="26%" r="82%">
+        <linearGradient id={gid} x1="0.1" y1="0" x2="0.85" y2="1">
           <stop offset="0%" stopColor={light} />
-          <stop offset="55%" stopColor={base} />
+          <stop offset="50%" stopColor={base} />
           <stop offset="100%" stopColor={shade} />
-        </radialGradient>
+        </linearGradient>
       </defs>
-      {/* stubby arms out to the sides */}
-      <path d="M19 33 Q11 33 10 41" stroke={base} strokeWidth="7" fill="none" strokeLinecap="round" />
-      <path d="M19 33 Q11 33 10 41" stroke={OUTLINE} strokeWidth="1.9" fill="none" strokeLinecap="round" opacity="0.5" />
-      <path d="M45 33 Q53 33 54 41" stroke={shade} strokeWidth="7" fill="none" strokeLinecap="round" />
-      <path d="M45 33 Q53 33 54 41" stroke={OUTLINE} strokeWidth="1.9" fill="none" strokeLinecap="round" opacity="0.5" />
-      {/* little feet */}
-      <ellipse cx="26" cy="55.5" rx="4.2" ry="2.6" fill={base} stroke={OUTLINE} strokeWidth="1.9" />
-      <ellipse cx="38" cy="55.5" rx="4.2" ry="2.6" fill={shade} stroke={OUTLINE} strokeWidth="1.9" />
-      {/* body with baked top-left light */}
-      <path d={body} fill={`url(#${gid})`} stroke={OUTLINE} strokeWidth="2.1" strokeLinejoin="round" />
-      {/* wrap bands, contained to the body */}
-      <g clipPath={`url(#${cid})`}>
-        <g stroke={band} strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.85">
-          <path d="M18 23 Q32 28 46 23" />
-          <path d="M18 31 Q32 36 46 31" />
-          <path d="M18 39 Q32 44 46 38" />
-          <path d="M20 47 Q32 52 44 46" />
-          <path d="M24 20 L28 25 M40 25 L44 20 M28 42 L33 47 M37 34 L41 38" />
+
+      {/* ── legs: two cylinders, rounded caps = feet ── */}
+      <line x1="28.5" y1="41" x2="28.5" y2="61" stroke={base} strokeWidth="7.6" strokeLinecap="round" />
+      <line x1="35.5" y1="41" x2="35.5" y2="61" stroke={shade} strokeWidth="7.6" strokeLinecap="round" />
+      <line x1="27" y1="43" x2="27" y2="59" stroke={light} strokeWidth="2.4" strokeLinecap="round" opacity="0.8" />
+      <line x1="34.2" y1="43" x2="34.2" y2="59" stroke={base} strokeWidth="2.2" strokeLinecap="round" opacity="0.7" />
+
+      {/* ── torso with broad shoulders tapering to the waist ── */}
+      <path
+        d="M17 28 Q16 22 24 21 L40 21 Q48 22 47 28 L41 33 L39 45 Q32 48 25 45 L23 33 Z"
+        fill={`url(#${gid})`}
+      />
+      {/* shoulder-top lit edge + shadowed right flank for cylinder volume */}
+      <path d="M18 27 Q24 22 32 22 Q40 22 46 27" fill="none" stroke={light} strokeWidth="1.6" strokeLinecap="round" opacity="0.7" />
+      <path d="M40 22 Q46 23 46 28 L40 33 L38.5 44 Q35 46 32 46 Z" fill={shade} opacity="0.4" />
+
+      {/* ── neck + head; only the eyes show ── */}
+      <path d="M28.5 18 L35.5 18 L35 23 L29 23 Z" fill={shade} opacity="0.7" />
+      <ellipse cx="32" cy="12.5" rx="6.4" ry="7" fill={`url(#${gid})`} />
+      <path d="M33 6 Q38.4 8 38.4 12.5 Q38.4 17 34 19 Z" fill={shade} opacity="0.45" />
+
+      {/* ── arms straight FORWARD (in front of the torso): foreshortened cylinders ── */}
+      {/* occlusion seams where the arms meet the torso */}
+      <line x1="28" y1="25" x2="28" y2="46" stroke={shade} strokeWidth="2.2" strokeLinecap="round" opacity="0.4" />
+      <line x1="36" y1="25" x2="36" y2="46" stroke={shade} strokeWidth="2.2" strokeLinecap="round" opacity="0.5" />
+      <line x1="24.5" y1="24" x2="24.5" y2="47" stroke={base} strokeWidth="6.6" strokeLinecap="round" />
+      <line x1="39.5" y1="24" x2="39.5" y2="47" stroke={shade} strokeWidth="6.6" strokeLinecap="round" />
+      <line x1="23" y1="26" x2="23" y2="45" stroke={light} strokeWidth="2.2" strokeLinecap="round" opacity="0.85" />
+      <line x1="38.2" y1="26" x2="38.2" y2="45" stroke={base} strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+
+      {/* ── bandage wraps across everything (groove + a lit upper edge) ── */}
+      <g strokeLinecap="round" fill="none">
+        <g stroke={band} strokeWidth="1.5" opacity="0.85">
+          {/* torso */}
+          <path d="M20 31 Q32 34 44 31 M21 37 Q32 40 43 37 M23 43 Q32 46 41 43" />
+          {/* arms */}
+          <path d="M21.5 30 L27.5 31 M21.5 37 L27.5 38 M36.5 31 L42.5 30 M36.5 38 L42.5 37" />
+          {/* legs */}
+          <path d="M25 48 L32 49 M25 54 L32 55 M33 48 L40 49 M33 54 L40 55" />
+          {/* head */}
+          <path d="M26 9 Q32 11 38 9 M26.5 15.5 Q32 17.5 37.5 15.5" />
         </g>
-        {/* soft occlusion down the shadowed right side */}
-        <path d="M40 15 C 47 22, 47 40, 40 55 L 48 46 L 47 24 Z" fill={shade} opacity="0.5" />
+        <g stroke={bandHi} strokeWidth="0.7" opacity="0.55">
+          <path d="M20 30.2 Q32 33.2 44 30.2 M23 42.2 Q32 45.2 41 42.2" />
+        </g>
       </g>
-      {/* loose dangling wrap end */}
-      <path d="M40 53 L45 58 L39 57.5 Z" fill={base} stroke={OUTLINE} strokeWidth="1.6" strokeLinejoin="round" />
-      {/* shadowed eye band + glaring eyes */}
-      <path d="M21 33 Q32 30 43 33 Q43 39 32 39 Q21 39 21 33 Z" fill="#241a10" opacity="0.9" />
-      <circle cx="27" cy="35" r="2.2" fill={eye} />
-      <circle cx="37" cy="35" r="2.2" fill={eye} />
-      <circle cx="26.4" cy="34.4" r="0.8" fill="#fff7db" />
-      <circle cx="36.4" cy="34.4" r="0.8" fill="#fff7db" />
+
+      {/* ── glaring eyes through a shadowed slit ── */}
+      <path d="M26 12.5 Q32 10.8 38 12.5 Q37.6 16.4 32 16.8 Q26.4 16.4 26 12.5 Z" fill="#20160c" opacity="0.92" />
+      <circle cx="29.4" cy="13.3" r="1.8" fill={eye} />
+      <circle cx="34.6" cy="13.3" r="1.8" fill={eye} />
+      <circle cx="28.9" cy="12.8" r="0.7" fill="#fff7db" />
+      <circle cx="34.1" cy="12.8" r="0.7" fill="#fff7db" />
     </svg>
   );
 }
 
-/** Scorpion — the slower pursuer. variant 'white' or 'red'. Drawn side-on. */
+/** Scorpion — the slower pursuer. variant 'white' or 'red'. Drawn TOP-DOWN. */
 export function ScorpionSprite({
   size = 48,
   className,
@@ -153,38 +186,52 @@ export function ScorpionSprite({
   const base = isRed ? '#b04e34' : '#b28c46';
   const light = isRed ? '#c86e51' : '#cba766';
   const shade = isRed ? '#742e1d' : '#7c5f2c';
+  const dark = isRed ? '#4a241a' : '#4a3a1e';
   const gid = `scorp-body-${variant}`;
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" className={className} aria-label={`${variant} scorpion`}>
       <defs>
-        <radialGradient id={gid} cx="36%" cy="26%" r="80%">
+        <linearGradient id={gid} x1="0.15" y1="0.1" x2="0.85" y2="0.9">
           <stop offset="0%" stopColor={light} />
-          <stop offset="55%" stopColor={base} />
+          <stop offset="52%" stopColor={base} />
           <stop offset="100%" stopColor={shade} />
-        </radialGradient>
+        </linearGradient>
       </defs>
-      {/* tail arcing over from the rear, stinger poised */}
-      <path d="M32 32 Q29 15 39 12 Q49 11 46 21" fill="none" stroke={base} strokeWidth="6.5" strokeLinecap="round" />
-      <path d="M32 32 Q29 15 39 12 Q49 11 46 21" fill="none" stroke={OUTLINE} strokeWidth="1.9" strokeLinecap="round" opacity="0.5" />
-      <path d="M45 20 L51 22 L47 26 Z" fill={shade} stroke={OUTLINE} strokeWidth="1.8" strokeLinejoin="round" />
-      {/* legs */}
-      <g stroke={OUTLINE} strokeWidth="2" strokeLinecap="round">
-        <path d="M26 40 L15 36 M26 44 L14 46 M27 48 L17 53" />
-        <path d="M38 40 L49 36 M38 44 L50 46 M37 48 L47 53" />
+
+      {/* ── eight walking legs, jointed, splayed to the sides ── */}
+      <g stroke={dark} strokeWidth="1.8" strokeLinecap="round" fill="none">
+        <path d="M27 38 Q19 34 14 37 M27 42 Q18 41 13 45 M28 46 Q19 47 15 52 M29 50 Q22 53 18 58" />
+        <path d="M37 38 Q45 34 50 37 M37 42 Q46 41 51 45 M36 46 Q45 47 49 52 M35 50 Q42 53 46 58" />
       </g>
-      {/* abdomen (rear) */}
-      <ellipse cx="32" cy="37" rx="11.5" ry="9" fill={`url(#${gid})`} stroke={OUTLINE} strokeWidth="2.1" />
-      {/* head / thorax (front) */}
-      <ellipse cx="32" cy="46" rx="9" ry="7" fill={`url(#${gid})`} stroke={OUTLINE} strokeWidth="2" />
-      {/* segment lines */}
-      <path d="M23 35 Q32 38 41 35 M24 40 Q32 43 40 40" stroke={shade} strokeWidth="1.6" fill="none" strokeLinecap="round" />
-      {/* claws reaching forward */}
-      <path d="M25 50 Q17 55 19 61 Q22 56 27 57 Z" fill={base} stroke={OUTLINE} strokeWidth="2" strokeLinejoin="round" />
-      <path d="M39 50 Q47 55 45 61 Q42 56 37 57 Z" fill={shade} stroke={OUTLINE} strokeWidth="2" strokeLinejoin="round" />
-      {/* highlight + eyes */}
-      <ellipse cx="27.5" cy="33.5" rx="3.4" ry="2.2" fill={light} opacity="0.9" />
-      <circle cx="29.5" cy="45" r="1.4" fill={OUTLINE} />
-      <circle cx="34.5" cy="45" r="1.4" fill={OUTLINE} />
+
+      {/* ── abdomen (rear, up) then carapace (front, down) ── */}
+      <path d="M32 24 Q41 26 41 34 Q41 43 32 46 Q23 43 23 34 Q23 26 32 24 Z" fill={`url(#${gid})`} />
+      <ellipse cx="32" cy="47" rx="8" ry="6.2" fill={`url(#${gid})`} />
+      {/* segment ridges + a lit top-left sheen */}
+      <g stroke={shade} strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.7">
+        <path d="M24 30 Q32 33 40 30 M24 35 Q32 38 40 35 M25 40 Q32 43 39 40" />
+      </g>
+      <path d="M27 27 Q24 31 25 37" stroke={light} strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.8" />
+
+      {/* ── pedipalp claws reaching forward toward the prey ── */}
+      <g>
+        <path d="M28 49 L23 55" stroke={base} strokeWidth="3.2" strokeLinecap="round" />
+        <path d="M22 52 Q17 54 17 59 Q17 62 20 61 Q19 58 22 57 Q20 55 24 55 Q22 53 22 52 Z" fill={base} stroke={dark} strokeWidth="0.9" strokeLinejoin="round" />
+        <path d="M36 49 L41 55" stroke={shade} strokeWidth="3.2" strokeLinecap="round" />
+        <path d="M42 52 Q47 54 47 59 Q47 62 44 61 Q45 58 42 57 Q44 55 40 55 Q42 53 42 52 Z" fill={shade} stroke={dark} strokeWidth="0.9" strokeLinejoin="round" />
+      </g>
+
+      {/* ── tail (metasoma) arcing up and curling over the back to the stinger ── */}
+      <path d="M32 26 Q26 16 32 11 Q40 7 44 14" fill="none" stroke={base} strokeWidth="5" strokeLinecap="round" />
+      <path d="M44 14 Q47 18 43 22" fill="none" stroke={shade} strokeWidth="4" strokeLinecap="round" />
+      <g stroke={dark} strokeWidth="0.9" opacity="0.6" strokeLinecap="round">
+        <path d="M29 21 L34 20 M28 15 L33 15 M34 11 L37 13 M41 11 L44 13" />
+      </g>
+      <path d="M43 22 Q47 24 45 28 L40 24 Z" fill={shade} stroke={dark} strokeWidth="0.9" strokeLinejoin="round" />
+
+      {/* ── two eyes on the carapace ── */}
+      <circle cx="30" cy="46" r="1.3" fill="#22160b" />
+      <circle cx="34" cy="46" r="1.3" fill="#22160b" />
     </svg>
   );
 }
