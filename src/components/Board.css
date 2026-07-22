@@ -30,6 +30,9 @@
   grid-template-rows: repeat(var(--rows), var(--cell));
   gap: 0;
   background: var(--floor-b);
+  /* Cache the textured floor as its own GPU layer so sprites moving over it
+     don't repaint the cells (part of the anti-stutter compositing pass). */
+  transform: translateZ(0);
   /* Baked ambient occlusion: the play field darkens toward every inner edge, as
      if the surrounding walls bounce no light back. Painted, not cast. */
   box-shadow:
@@ -101,6 +104,19 @@
   z-index: 2;
 }
 
+/* All wall/gate slabs share ONE cached compositor layer. The extruded walls are
+   drawn with stacked box-shadows (expensive to repaint); caching them as a GPU
+   texture means a sprite animating OVER them never triggers their repaint — the
+   fix for the whole-board 3 FPS stutter while anything moves. z-index 2 keeps
+   the plane above the AO (1) and below the grain (3)/exit (4)/sprites. */
+.board__walls {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  transform: translateZ(0);
+}
+
 /* Baked AO + a soft grain film, both sized to the grid and set in Board.tsx.
    The vignette sits just above the floor (below walls); the grain sits above the
    walls (below sprites) so floor and stone share one layer of compression fuzz. */
@@ -141,7 +157,10 @@
   position: absolute;
   width: var(--cell);
   height: var(--cell);
-  transition: transform 120ms linear, opacity 200ms ease-out;
+  /* Position hops are animated by the Web Animations API (Board.tsx) on the
+     COMPOSITOR — no CSS transform transition here, so the two can't fight and
+     force main-thread animation. Opacity (exit fade) still transitions. */
+  transition: opacity 200ms ease-out;
   will-change: transform, opacity;
 }
 

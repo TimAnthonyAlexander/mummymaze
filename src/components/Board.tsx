@@ -266,7 +266,7 @@ const BoardWalls = memo(function BoardWalls({
   for (const s of walls) (s.orient === 'h' ? hSet : vSet).add(segKey(s.x, s.y));
 
   return (
-    <>
+    <div className="board__walls">
       {walls.map((seg) => (
         <div
           key={`sh-${seg.orient}-${seg.x}-${seg.y}`}
@@ -301,7 +301,7 @@ const BoardWalls = memo(function BoardWalls({
           />
         );
       })}
-    </>
+    </div>
   );
 });
 
