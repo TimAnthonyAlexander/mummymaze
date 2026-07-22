@@ -365,6 +365,13 @@ No backend; everything runs client-side.
   glowing eyes instead of its full body; the exit keeps a faint beacon glow. The
   lit/unlit test is a pure helper so it is unit-testable without the DOM. The
   overlay respects `prefers-reduced-motion` (no light flicker).
+- **Shipped visual style** is a stylized early-2000s pre-render: muddy sandstone
+  textures (procedural `feTurbulence`, baked light), an ornate Egyptian hieroglyph
+  "cabinet" frame around the board, carved-stone UI chrome, and low-poly-read
+  sprites (upstanding cylinder-limbed figures + a top-down scorpion). This is
+  **view-only** — it changes no rule or state — and is documented in `CLAUDE.md`
+  ("Visual system"). The board is split into memoized static layers so a turn
+  animation repaints only the moving sprites.
 
 ### 6.4 Controls
 
@@ -489,9 +496,16 @@ tests/
 ## 12. Non-goals for v1
 
 - No backend, accounts, leaderboards, or networked features.
-- No original assets reused; placeholder original art/audio only.
-- No level editor UI (engine/format is designed to allow it later).
-- No sound design beyond an optional simple toggle.
+- No **reused** original assets — all art/audio is original or CC0 (public domain).
+
+Since-shipped (these were non-goals at spec time, now built):
+
+- A **level editor UI** (`/editor`) that round-trips the authoring JSON and
+  validates via the loader + solver.
+- **Sound design** beyond a toggle: recorded **CC0 (Kenney, public domain)** SFX
+  played via Web Audio (`src/game/sound.ts`, `src/assets/audio/`), on/off setting
+  preserved.
+- A full **early-2000s pre-rendered visual style** (see §6.3 and `CLAUDE.md`).
 
 ---
 

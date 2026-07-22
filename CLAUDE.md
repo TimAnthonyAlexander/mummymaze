@@ -69,7 +69,12 @@ Three layers, cleanly separated.
   Triggers sound at trace events; honors the animations setting (snap when off).
 - `render.ts` — `RenderState` + `toRender` (what `Board` draws, decoupled from
   `GameState`). Includes `playerFacing: Dir` (defaults south) for sprite facing.
-- `sound.ts` — procedural Web Audio SFX (no files). **See Safari gotcha below.**
+- `sound.ts` — sample-based SFX. Short **CC0 (Kenney, public domain)** clips in
+  `src/assets/audio/*.mp3` (provenance in `src/assets/audio/CREDITS.md`), fetched +
+  `decodeAudioData`'d once into `AudioBuffer`s and fired via `BufferSource` + gain;
+  same event API (`sfx.step/monster/key/merge/win/lose/hint/blockedWait`). Was
+  procedural synths (read as "8-bit") until the 2002 pass. **See Safari gotcha
+  below** — the one-time gesture unlock now also warms/decodes every sample.
 - `storage.ts` — safe localStorage wrapper, key `maze-escape:v1`; degrades to
   in-memory, never throws.
 - `useProgress.ts` — unlock/best-moves/completion; unlocking follows the pyramid
@@ -90,7 +95,11 @@ Three layers, cleanly separated.
   (a top always covers a neighbour's shadow) and only the outer silhouette
   extrudes. Gates reuse the same two-plane classes (so they merge in 3D) but the
   top is a barred `gate-top` portcullis. **Do not casually edit `Board.css`
-  sprite/wall/gate/exit rules.**
+  sprite/wall/gate/exit rules.** PERF: the board is split into memoized layers
+  (`BoardFloor` = the textured cells + decals, `BoardStaticOverlay` = AO/grain/exit,
+  `BoardWalls` = walls+gates keyed on `gatesOpen`) so a turn animation re-renders
+  ONLY the sprites, not the ~144 textured cells + walls each hop. Keep new static
+  board chrome inside a memoized layer, not the per-hop `Board` body.
 - `components/sprites/CharacterSprites.tsx` — hand-drawn inline-SVG mummy /
   explorer / scorpion, cel-shaded, styled after the pre-rendered PNGs in
   `src/assets/sprites/` (those PNGs are unused reference now — kept, not
@@ -107,7 +116,46 @@ Three layers, cleanly separated.
 - Routes in `App.tsx`: `/` → last-played or level 1; `/play/:levelId`; `/map`;
   `/editor`; `/playtest`.
 - `theme.ts` — warm desert-tomb palette (one gold + one lapis accent, flat, no
-  gradients). `index.css` — reset, focus-visible ring, reduced-motion.
+  gradients). `index.css` — reset, focus-visible ring, reduced-motion, the
+  tomb-wall body backdrop, AND the global **carved-stone UI primitives**
+  (`.stone-btn` [+`--sm`/`--warn`/`--gold`/`--muted`], `.stone-tag`, `.stone-slab`,
+  `.stone-sign`, `.stone-plaque`, `.sidebar`). **`index.css` MUST be imported in
+  `main.tsx`** — it was orphaned for a long time, so every rule in it (stone
+  classes, backdrop, focus ring) silently didn't apply; MUI's `CssBaseline` masked
+  the missing reset. If stone classes "don't apply", check that import first.
+
+## Visual system (the 2002 pre-render pass)
+
+The whole app is styled as an early-2000s pre-rendered isometric-ish tomb game
+(muddy sandstone, baked lighting, carved stone chrome). This is **view-only** —
+no engine/mechanics changed. Key pieces:
+
+- **`src/game/textures.ts`** — procedural, seamlessly-tiling sandstone/stone
+  textures from `feTurbulence` (baked into the diffuse, no real-time light),
+  exported as `boardTextures` data-URI CSS `url(...)`s: `floorA`/`floorB` (checker),
+  `wallTop`, `grain` (a soft-light film), `frameStone` (dark carved stone). Small
+  tiles so the repeat is faintly visible (the biggest 2002 tell).
+- **`src/game/frieze.ts` + `components/BoardFrame.tsx/.css`** — the ornate Egyptian
+  cabinet frame around the board: a hand-authored, tileable hieroglyph frieze
+  (ankh/sun-disc/seated-pharaoh/eye-of-horus), twisted-rope side braids, and corner
+  sun-disc rosettes. Thickness scales with the pane (reserved in `BoardPane`).
+- **`components/sprites/CharacterSprites.tsx`** — the cast rebuilt as low-poly
+  pre-render read: mummy + explorer are **upstanding, broad-shouldered men built
+  from cylinder limbs** (arms thrust straight forward foreshorten to short stubs;
+  the explorer's arms bend at the elbow), the scorpion is **top-down**. Baked
+  top-left light via gradients, soft self-colored edges (no ink outline), muddy
+  palette; red/white stays distinct. `MonsterSprite`/`ExplorerSprite` are `memo`'d.
+- **`components/sprites/TileDecals.tsx`** — skull/key as carved-stone medallions
+  (not line icons). The exit (`Board.tsx` `ExitOpening`) is an in-tile descending
+  staircase with a warm glow.
+- **`components/Ankh.tsx`** — a gilded ☥; **`components/SidebarPyramid.tsx`** — the
+  current pyramid drawn with the map's own carved-stone `PyramidSprite`.
+- **Desktop `Sidebar.tsx`** — carved-stone rail: NO movement wheel (arrow/WASD
+  move), big full-width stone `.stone-btn` keys for Map/Editor, the pyramid moved
+  to the bottom in a `.stone-plaque` with the ankh, engraved status + stone tags.
+  `Controls` gained `showWheel` (desktop `false`) and `compact` (mobile icon row).
+- **Map (`WorldTrail`/`MapPage`)** and the **win/lose overlay (`BoardPane`)** use the
+  same stone primitives (signs, cartouche header, night vignette, stone tablet).
 
 ## Levels: the generate-don't-edit rule
 
@@ -197,6 +245,21 @@ Three layers, cleanly separated.
   the current pack if you need them; don't trust them as-is.
 - `pack.test.ts` SAMPLES levels (base+apex of each pyramid + a seeded subset), not
   all 170 — keep it that way so the suite stays fast.
+- **Vite dep-cache corruption.** If the dev log shows "You are loading @emotion/react
+  when it is already loaded" / "multiple copies of React" / "Invalid hook call" and
+  the app renders as unstyled defaults, it's a stale optimize cache, not your code:
+  `rm -rf node_modules/.vite` and restart the dev server.
+- **Orphaned CSS import.** A global CSS file only applies if something imports it.
+  `index.css` (stone primitives + backdrop) is imported in `main.tsx`; a
+  component CSS (`Board.css`, `BoardFrame.css`) by its component. Rules that "don't
+  apply" are usually an un-imported stylesheet, not a specificity problem. Prefer
+  setting a Paper/Box background via `sx` (instance) over a competing class — MUI's
+  `MuiPaper` theme override (`backgroundImage:'none'`) ties on specificity with a
+  plain class and wins unpredictably by injection order.
+- **Mobile viewport / iOS 26 floating nav.** `MobileShell` sizes to `100svh`
+  (+ `100vh` fallback) with `env(safe-area-inset-bottom)` padding on the control
+  cluster, so the movement wheel is never hidden under Safari's floating tab bar.
+  Use `svh`, not `vh`, for any full-height mobile shell.
 
 ## Verification workflow
 
