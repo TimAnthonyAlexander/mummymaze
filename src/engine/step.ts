@@ -16,7 +16,7 @@
  * keeping the solver's hot path allocation-free.
  */
 import { canCross, inBounds, neighbor, samePos } from './board';
-import { monsterStep, stepsPerTurn } from './monsters';
+import { isMummy, monsterStep, stepsPerTurn } from './monsters';
 import type { Action, Dir, GameState, Level, Monster, Pos } from './types';
 
 /** One monster or the player hopping a single tile. */
@@ -181,11 +181,21 @@ function run(state: GameState, action: Action, trace: TraceEvent[] | null): Game
         gatesOpen = toggleAllGates(gatesOpen);
         if (trace) trace.push({ kind: 'gate', gatesOpen });
       }
-      // Collision: moving monster survives, other is destroyed.
+      // Collision. A mummy always beats a scorpion (the scorpion is knocked
+      // out), regardless of which one moved; a same-class collision is won by
+      // the moving monster.
       const other = aliveMonsterIndexAt(monsters, nextPos, i);
       if (other !== -1) {
-        monsters[other] = { ...monsters[other], alive: false };
-        if (trace) trace.push({ kind: 'kill', actor: monsters[other].id });
+        const moverIsMummy = isMummy(monsters[i].kind);
+        const otherIsMummy = isMummy(monsters[other].kind);
+        // The only way the mover loses is a scorpion charging into a mummy.
+        const moverLoses = !moverIsMummy && otherIsMummy;
+        const loser = moverLoses ? i : other;
+        monsters[loser] = { ...monsters[loser], alive: false };
+        if (trace) trace.push({ kind: 'kill', actor: monsters[loser].id });
+        // Mover destroyed: it takes no further sub-steps and cannot catch the
+        // player. (Only a scorpion — 1 step/turn — can ever be the loser here.)
+        if (moverLoses) break;
       }
       // Caught the player?
       if (samePos(nextPos, player)) {

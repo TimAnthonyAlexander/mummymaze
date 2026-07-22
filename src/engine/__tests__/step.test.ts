@@ -83,6 +83,101 @@ describe('step: win / lose resolution', () => {
     expect(alive[0].pos).toEqual({ x: 2, y: 0 });
   });
 
+  // --- Mixed and same-class monster collisions (survivor rule) ---
+  // A mummy ALWAYS beats a scorpion (the scorpion is destroyed) regardless of
+  // which one moved; a same-class collision is won by the moving monster.
+
+  it('scorpion moving into a stationary mummy: the SCORPION dies', () => {
+    // Player at (3,2). Mummy at (2,2) is pinned (its E toward the player is
+    // walled, so it stays). Scorpion at (1,2) — behind the mummy — charges E
+    // onto the mummy's tile. The scorpion (the mover) loses, and must NOT go on
+    // to catch the player who sits just behind the mummy.
+    const level = loadLevel({
+      id: 'scorp-into-mummy',
+      name: 'scorp-into-mummy',
+      width: 5,
+      height: 5,
+      start: { x: 3, y: 2 },
+      exit: { x: 4, y: 4, dir: 'S' },
+      walls: [{ x: 2, y: 2, dir: 'E' }],
+      monsters: [
+        { kind: 'mummy_white', x: 2, y: 2 },
+        { kind: 'scorpion_white', x: 1, y: 2 },
+      ],
+    });
+    const s = step(initGame(level), 'wait');
+    expect(s.phase).toBe('player'); // scorpion did not catch the player
+    expect(s.monsters[0].alive).toBe(true); // mummy survives
+    expect(s.monsters[0].pos).toEqual({ x: 2, y: 2 });
+    expect(s.monsters[1].alive).toBe(false); // scorpion destroyed
+  });
+
+  it('mummy moving into a stationary scorpion: the scorpion dies (mover mummy survives)', () => {
+    // Player at (3,2). Scorpion at (2,2) is pinned (E walled). Mummy at (0,2)
+    // steps E,E onto the scorpion's tile; the mummy (mover) survives.
+    const level = loadLevel({
+      id: 'mummy-into-scorp',
+      name: 'mummy-into-scorp',
+      width: 5,
+      height: 5,
+      start: { x: 3, y: 2 },
+      exit: { x: 4, y: 4, dir: 'S' },
+      walls: [{ x: 2, y: 2, dir: 'E' }],
+      monsters: [
+        { kind: 'scorpion_white', x: 2, y: 2 },
+        { kind: 'mummy_white', x: 0, y: 2 },
+      ],
+    });
+    const s = step(initGame(level), 'wait');
+    expect(s.monsters[0].alive).toBe(false); // scorpion destroyed
+    expect(s.monsters[1].alive).toBe(true); // mummy survives
+    expect(s.monsters[1].pos).toEqual({ x: 2, y: 2 });
+  });
+
+  it('mummy moving into a stationary mummy: the stationary one dies (mover wins)', () => {
+    // Player at (3,2). Mummy at (2,2) is pinned (E walled). Mummy at (0,2) steps
+    // E,E onto it; the mover survives, the stationary one is destroyed.
+    const level = loadLevel({
+      id: 'mummy-into-mummy',
+      name: 'mummy-into-mummy',
+      width: 5,
+      height: 5,
+      start: { x: 3, y: 2 },
+      exit: { x: 4, y: 4, dir: 'S' },
+      walls: [{ x: 2, y: 2, dir: 'E' }],
+      monsters: [
+        { kind: 'mummy_white', x: 2, y: 2 },
+        { kind: 'mummy_white', x: 0, y: 2 },
+      ],
+    });
+    const s = step(initGame(level), 'wait');
+    expect(s.monsters[0].alive).toBe(false); // stationary mummy destroyed
+    expect(s.monsters[1].alive).toBe(true); // moving mummy survives
+    expect(s.monsters[1].pos).toEqual({ x: 2, y: 2 });
+  });
+
+  it('scorpion moving into a stationary scorpion: the stationary one dies (mover wins)', () => {
+    // Player at (3,2). Scorpion at (2,2) is pinned (E walled). Scorpion at (1,2)
+    // steps E onto it; the mover survives, the stationary one is destroyed.
+    const level = loadLevel({
+      id: 'scorp-into-scorp',
+      name: 'scorp-into-scorp',
+      width: 5,
+      height: 5,
+      start: { x: 3, y: 2 },
+      exit: { x: 4, y: 4, dir: 'S' },
+      walls: [{ x: 2, y: 2, dir: 'E' }],
+      monsters: [
+        { kind: 'scorpion_white', x: 2, y: 2 },
+        { kind: 'scorpion_white', x: 1, y: 2 },
+      ],
+    });
+    const s = step(initGame(level), 'wait');
+    expect(s.monsters[0].alive).toBe(false); // stationary scorpion destroyed
+    expect(s.monsters[1].alive).toBe(true); // moving scorpion survives
+    expect(s.monsters[1].pos).toEqual({ x: 2, y: 2 });
+  });
+
   it('stepping on a key toggles all gates', () => {
     const level = loadLevel({
       id: 'key',

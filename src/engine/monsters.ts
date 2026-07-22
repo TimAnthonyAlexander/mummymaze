@@ -10,6 +10,10 @@ export function stepsPerTurn(kind: MonsterKind): number {
   return kind === 'mummy_white' || kind === 'mummy_red' ? 2 : 1;
 }
 
+export function isMummy(kind: MonsterKind): boolean {
+  return kind === 'mummy_white' || kind === 'mummy_red';
+}
+
 function horizontalFirst(kind: MonsterKind): boolean {
   return kind === 'mummy_white' || kind === 'scorpion_white';
 }
