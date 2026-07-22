@@ -76,9 +76,19 @@ Three layers, cleanly separated.
   procedural synths (read as "8-bit") until the 2002 pass. **See Safari gotcha
   below** — the one-time gesture unlock now also warms/decodes every sample.
 - `storage.ts` — safe localStorage wrapper, key `maze-escape:v1`; degrades to
-  in-memory, never throws.
-- `useProgress.ts` — unlock/best-moves/completion; unlocking follows the pyramid
-  order via `pyramids.ts`.
+  in-memory, never throws. **The `completedLevelIds` set is the SINGLE source of
+  truth for progression** — there is deliberately no stored `unlockedLevelIds`
+  (removed): storing derived unlock state let it desync from the pyramid order
+  after a reorder (phantom frontiers/helmets). Only `completedLevelIds`,
+  `bestMoves`, `lastPlayedLevelId` (vestigial), and `settings` persist.
+- `useProgress.ts` — DERIVES everything from the completed set + pyramid order,
+  never stores unlock state. The current **objective** = the level right AFTER
+  the FURTHEST completed one (`currentObjectiveId` in `pyramids.ts`), NOT the
+  first uncompleted — so an early skipped level (holes appear when the pack is
+  reordered mid-save) never drags you back to the start. `unlocked` = every level
+  up to & including the objective (completed levels replay, skipped ones stay
+  playable, the objective is the single frontier). `currentLevelId` = that
+  objective; the map marks it with one explorer head.
 - `useHints.ts` — on-demand `solveFrom` for the one-hint-per-level + full-solution
   reveal.
 - `useSettings.ts` — sound/animations toggles.
@@ -86,6 +96,13 @@ Three layers, cleanly separated.
 **3. UI — `src/components/`, `src/pages/`:**
 - `pages/GamePage.tsx` — the shell. Branches on `useMediaQuery(down('md'))`:
   desktop = `Sidebar` + `BoardPane`; mobile = `MobileShell`. Owns keyboard input.
+  **The level is NOT in the URL** — GamePage resolves it from (a) ephemeral
+  `location.state.levelId` (set when you pick a level on the map / "next"), else
+  (b) the objective from localStorage. The objective is captured once per mount
+  (a ref) so winning — which advances the objective — never swaps the board out
+  from under the win screen. `currentId` passed to the sidebar is the level you're
+  PLAYING (so the sidebar's explorer head = "you are here", even on a replay);
+  the MAP's marker is the objective.
 - `components/Board.tsx` (+ `Board.css`) — the square board, sprites, walls,
   gates, exit opening. The grid stays a flat perfect square; depth is FAKED
   (light source top-left). Walls are extruded slabs computed by
@@ -113,7 +130,7 @@ Three layers, cleanly separated.
 - `pages/MapPage.tsx` — the world map (`/map`): pyramids as clickable shapes.
 - `pages/EditorPage.tsx` (+ `components/editor/*`) — the level editor (`/editor`),
   live solvability + par + JSON export/import. `PlaytestPage.tsx` (`/playtest`).
-- Routes in `App.tsx`: `/` → last-played or level 1; `/play/:levelId`; `/map`;
+- Routes in `App.tsx`: `/` → `/play`; `/play` (NO level id — see GamePage); `/map`;
   `/editor`; `/playtest`.
 - `theme.ts` — warm desert-tomb palette (one gold + one lapis accent, flat, no
   gradients). `index.css` — reset, focus-visible ring, reduced-motion, the
@@ -167,7 +184,15 @@ no engine/mechanics changed. Key pieces:
   groups levels into **pyramids of 10** (rows 4/3/2/1, climbed base→apex) with
   themed names, and defines the play/unlock order (`progressionOrder`,
   `nextInProgression`, `getPyramidOfLevel`, `pyramidLevelIds`, `displayName`,
-  `levelNumberInPyramid`). Keep that exported API stable — the UI depends on it.
+  `levelNumberInPyramid`, `currentObjectiveId`, `furthestCompletedIndex`). Keep
+  that exported API stable — the UI + `useProgress` depend on it.
+- **`buildPyramids` orders each pyramid's floors by BOARD SIZE** (dark level last
+  → apex), so the lowest floor always has the fewest squares and boards grow every
+  floor up. This is a LAYOUT concern here, separate from the generator: `tierPlan`
+  ramps size by *registry position*, but the floors are laid out here, so the
+  ordering MUST key on the size itself — else a big board lands on the base floor.
+  Because this re-orders the pyramid, unlock/progression must be derived from the
+  completed set (see `useProgress`), never stored.
 - Current pack: **180 levels / 18 pyramids** (10 levels each). Levels 1–9 are the
   hand-authored teaching curriculum; the rest are generated. Every level is
   build-time verified: solvable within the solver cap **under the current
@@ -210,9 +235,14 @@ no engine/mechanics changed. Key pieces:
   **spawn-in** intro (board starts black, explorer walks in from the right edge
   to its start tile, then lights come up — full reveal on lit levels, torch view
   on dark ones; one-time per load, skippable, snaps when animations off); the
-  **win-exit** walk; and a monster **crash** (loser squash-and-fade knockout +
-  survivor recoil + sandy dust puff on a `kill` trace event). All on non-memoized
-  layers so a turn still re-renders only sprite content.
+  **win-exit** walk; and a monster/player **crash** (loser squash-and-fade
+  knockout + survivor recoil + a **gray smoke cloud + gold sparkles** with the
+  merge sound, held so it finishes before the turn settles — also fired when the
+  player is caught). All on non-memoized layers so a turn still re-renders only
+  sprite content.
+- **Sprite hop movement is driven by the Web Animations API (WAAPI),** not a CSS
+  `transition` — see the compositing gotcha below (this is what fixed mobile
+  "static enemies" and the desktop 3-FPS stutter).
 
 ## Gotchas (read these)
 
@@ -256,6 +286,30 @@ no engine/mechanics changed. Key pieces:
   contained and the end-of-level `Paper` overlay (BoardPane, `zIndex: 5`) paints
   ABOVE them. Overlay z-scale: wall-shadow 1, wall-top/gate 2, exit 4, monster 6,
   player 7. Without the isolate, the win/lose buttons hide behind the walls.
+- **Sprite movement = WAAPI + GPU-cached board layers (perf-critical).** Each
+  single-tile hop is animated with `el.animate()` (Web Animations API) in a
+  `Board` `useLayoutEffect`, NOT a CSS `transition` — WAAPI runs on the compositor
+  and stays smooth even when the main thread is janky (a CSS transition drops
+  frames on a slow phone and the hop reads as a teleport = the "enemies look
+  static on mobile" bug). Multi-tile jumps (undo/restart/snap) are not animated.
+  The `.sprite` CSS has NO `transform` transition (only opacity) so the two can't
+  fight. CRITICAL companion: the extruded walls use stacked `box-shadow`s
+  (very expensive to repaint), so they + the floor are wrapped in **cached
+  compositor layers** (`.board__walls` and `.board__grid` get `transform:
+  translateZ(0)`). Without that, a sprite animating OVER the walls repaints them
+  every frame → the whole app drops to ~3 FPS while anything moves. Don't remove
+  the `translateZ(0)` or re-add a transform transition on `.sprite`.
+- **World-map clicks: don't `setPointerCapture` on `pointerdown`.** `WorldTrail`
+  is drag-to-pan; capturing the pointer on down makes Chrome retarget the ensuing
+  `click` to the scroll container, so a plain tap on a tomb never reaches its
+  `onClick` (tombs feel dead). Capture ONLY once the drag threshold is crossed
+  (in `pointermove`), so a stationary click selects the level.
+- **Current-step marker is an explorer HEAD, not a torch.** `PyramidSprite`
+  (shared by map + sidebar) draws a small pith-helmet head on the block whose
+  `stateOf` is `'current'` — ONLY that state (never `'available'`), so exactly one
+  head shows. The map's `stateOf` is completed-first (objective = current); the
+  SIDEBAR's is current-first (the level you're playing shows a head even when it's
+  a completed replay).
 - **Sprite facing is a horizontal MIRROR, never a rotation.** The art is
   top-down-ish with a look that breaks if rotated; rotating also spun the old
   baked PNG shadow. So `.sprite__body` only flips L/R (mirrors on west) over a
