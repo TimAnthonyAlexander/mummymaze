@@ -116,12 +116,20 @@ function parOf(id: string): number {
   return getLevel(id)?.par ?? Number.MAX_SAFE_INTEGER;
 }
 
+/** Board size (max dimension) of a level — the axis of the base→apex ramp. */
+function sizeOf(id: string): number {
+  const l = getLevel(id);
+  return l ? Math.max(l.width, l.height) : 0;
+}
+
 /**
- * Build the pyramids by chunking the flat registry into groups of ten. Every
- * pyramid's APEX (top rung) is its single dark/flashlight level, so dark levels
- * always sort LAST regardless of par. Among the lit rungs, pyramid 1 keeps its
- * authoring (teaching) order; every later pyramid is ordered base→apex by rising
- * par (tiebreak: registry order).
+ * Build the pyramids by chunking the flat registry into groups of ten and
+ * ordering each pyramid base→apex by BOARD SIZE: the lowest floor always has the
+ * fewest squares, and boards grow with every floor up. (The generator ramps size
+ * by registry position, but the floors are laid out here — so the ordering must
+ * key on the size itself, else a big board can land on the base floor.) Every
+ * pyramid's dark/flashlight level sorts LAST → the apex. Par then registry order
+ * break ties so same-size floors still read as gently rising.
  */
 function buildPyramids(): Pyramid[] {
   const pyramids: Pyramid[] = [];
@@ -129,13 +137,12 @@ function buildPyramids(): Pyramid[] {
   for (let p = 0; p < count; p++) {
     const chunk = LEVELS.slice(p * PYRAMID_SIZE, (p + 1) * PYRAMID_SIZE).map((l) => l.id);
     const ordered = [...chunk].sort((a, b) => {
-      // Dark level(s) always last → the apex. A dark apex is generated gentler
-      // (lower par), so par alone would wrongly sort it to the base.
       const da = isDark(a) ? 1 : 0;
       const db = isDark(b) ? 1 : 0;
-      if (da !== db) return da - db;
-      // Lit rungs: pyramid 1 keeps teaching order; others rise by par.
-      if (p === 0) return registryIndex(a) - registryIndex(b);
+      if (da !== db) return da - db; // dark apex last
+      const sa = sizeOf(a);
+      const sb = sizeOf(b);
+      if (sa !== sb) return sa - sb; // fewer squares on lower floors
       return parOf(a) - parOf(b) || registryIndex(a) - registryIndex(b);
     });
     pyramids.push({
