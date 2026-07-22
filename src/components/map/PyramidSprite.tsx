@@ -33,7 +33,6 @@ const C = {
   sand: '#caa763',
   sandHi: '#e0c489',
   sandDark: '#8a6f3a',
-  door: '#140d06',
   flame: '#ffcf6b',
   flameCore: '#fff2cf',
 };
@@ -154,8 +153,8 @@ function Torch({ cx, topY, s }: { cx: number; topY: number; s: number }) {
 
 /**
  * A pyramid drawn as a stepped tomb of carved stone blocks — one block per level
- * (base→apex, rows 4/3/2/1) — planted in sand, with a gilded capstone and a dark
- * entrance. Each unlocked block is individually clickable.
+ * (base→apex, rows 4/3/2/1) — planted in sand with a gilded capstone. Each
+ * unlocked block is individually clickable.
  */
 export function PyramidSprite({
   pyramid,
@@ -223,13 +222,6 @@ export function PyramidSprite({
         filter={gilded ? 'url(#goldGlow)' : undefined}
       />
       {blocks}
-      {/* entrance carved into the base */}
-      <path
-        d={`M ${-s * 0.34} 2 L ${-s * 0.34} ${-s * 0.66} Q 0 ${-s * 0.98} ${s * 0.34} ${-s * 0.66} L ${s * 0.34} 2 Z`}
-        fill={C.door}
-        stroke={C.mortar}
-        strokeWidth={Math.max(1, s * 0.05)}
-      />
       {/* front sand pile burying the very base */}
       <path
         d={`M ${-baseW * 0.66} 3 Q 0 ${-s * 0.24} ${baseW * 0.66} 3 L ${baseW * 0.66} ${s * 0.6} L ${-baseW * 0.66} ${s * 0.6} Z`}
