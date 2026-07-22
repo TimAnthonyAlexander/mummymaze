@@ -220,10 +220,15 @@ export function WorldTrail({
                   <feMergeNode in="SourceGraphic" />
                 </feMerge>
               </filter>
+              <radialGradient id="mapGlow" cx="50%" cy="40%" r="72%">
+                <stop offset="0%" stopColor="#2b1f11" />
+                <stop offset="55%" stopColor="#191108" />
+                <stop offset="100%" stopColor="#0d0904" />
+              </radialGradient>
             </defs>
 
-            {/* Flat night desert. */}
-            <rect x={0} y={0} width={layout.width} height={layout.height} fill="#14100a" />
+            {/* Night desert with a warm central pool of light. */}
+            <rect x={0} y={0} width={layout.width} height={layout.height} fill="url(#mapGlow)" />
 
             {/* The sand road. */}
             <path d={layout.path} fill="none" stroke="#2b2112" strokeWidth={sizing.tileSize * 0.5} strokeLinecap="round" strokeLinejoin="round" />
@@ -306,6 +311,7 @@ function PlaqueLabel({ node, index, name, isActive, progress, shape, tileSize, o
       type={clickable ? 'button' : undefined}
       onClick={onClick}
       aria-label={clickable ? `Go to ${name}` : name}
+      className={`stone-sign${isActive ? ' stone-sign--active' : ''}`}
       sx={{
         position: 'absolute',
         left: node.x,
@@ -313,19 +319,15 @@ function PlaqueLabel({ node, index, name, isActive, progress, shape, tileSize, o
         transform: 'translateX(-50%)',
         width: Math.min(shape + 44, 208),
         px: 1,
-        py: 0.5,
+        py: 0.6,
         m: 0,
-        borderRadius: 1,
         textAlign: 'center',
         fontFamily: 'inherit',
-        bgcolor: 'rgba(16,11,6,0.86)',
-        border: isActive ? '1px solid #e7bd48' : '1px solid rgba(201,154,30,0.28)',
-        boxShadow: isActive ? '0 0 12px rgba(231,189,72,0.25)' : 'none',
-        opacity: locked ? 0.7 : 1,
+        opacity: locked ? 0.72 : 1,
         cursor: clickable ? 'pointer' : 'default',
         pointerEvents: clickable ? 'auto' : 'none',
-        transition: 'transform 120ms ease, border-color 120ms ease',
-        '&:hover': clickable ? { transform: 'translateX(-50%) translateY(-2px)', borderColor: '#e7bd48' } : {},
+        transition: 'transform 120ms ease, filter 120ms ease',
+        '&:hover': clickable ? { transform: 'translateX(-50%) translateY(-2px)', filter: 'brightness(1.1)' } : {},
       }}
     >
       <Typography
@@ -334,7 +336,9 @@ function PlaqueLabel({ node, index, name, isActive, progress, shape, tileSize, o
         sx={{
           fontWeight: 700,
           lineHeight: 1.2,
-          color: isActive ? '#f4d774' : locked ? 'text.disabled' : 'text.primary',
+          letterSpacing: 0.2,
+          color: isActive ? '#f4d774' : locked ? 'text.disabled' : '#e8d7a8',
+          textShadow: '0 1px 0 rgba(0,0,0,0.6)',
         }}
       >
         {name}

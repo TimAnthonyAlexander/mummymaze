@@ -1,10 +1,16 @@
-import { useLayoutEffect, useRef, useState } from 'react';
-import { Box, Button, Paper, Stack, Typography } from '@mui/material';
-import { ArrowRight } from 'lucide-react';
+import { type CSSProperties, useLayoutEffect, useRef, useState } from 'react';
+import { Box, Stack, Typography } from '@mui/material';
+import { ArrowRight, RotateCcw } from 'lucide-react';
 import type { GameState } from '../engine';
 import type { RenderState } from '../game/render';
+import { boardTextures } from '../game/textures';
 import { Board } from './Board';
 import { BoardFrame } from './BoardFrame';
+
+const STONE_VARS = {
+  '--frame-stone': boardTextures.frameStone,
+  '--tablet-stone': boardTextures.wallTop,
+} as CSSProperties;
 
 /** Padding (px) reserved around the square board inside the pane. */
 const PANE_PADDING = 32;
@@ -87,39 +93,58 @@ export function BoardPane({
             <Board level={state.level} render={render} cellSize={cellSize} />
           </BoardFrame>
           {done && (
-            <Paper
-              elevation={8}
+            <Box
               sx={{
                 position: 'absolute',
                 inset: 0,
                 zIndex: 5,
                 display: 'grid',
                 placeItems: 'center',
-                bgcolor: 'rgba(20,16,10,0.82)',
+                bgcolor: 'rgba(12,8,3,0.72)',
                 borderRadius: 2,
               }}
             >
-              <Stack spacing={2} sx={{ alignItems: 'center' }}>
-                <Typography variant="h4" color={won ? 'success.main' : 'error.main'}>
+              <Box
+                className="stone-slab"
+                style={STONE_VARS}
+                sx={{ px: { xs: 3, sm: 4 }, py: { xs: 2.5, sm: 3 }, textAlign: 'center', maxWidth: '86%' }}
+              >
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                    mb: 2,
+                    color: won ? '#f4d774' : '#e79070',
+                    textShadow: '0 2px 0 rgba(0,0,0,0.65)',
+                  }}
+                >
                   {won ? 'You escaped!' : 'You died'}
                 </Typography>
-                <Stack direction="row" spacing={1}>
-                  <Button variant="contained" color="warning" onClick={onRestart}>
+                <Stack direction="row" spacing={1.25} sx={{ justifyContent: 'center' }}>
+                  <button
+                    type="button"
+                    className="stone-btn stone-btn--sm stone-btn--warn"
+                    style={{ width: 'auto' }}
+                    onClick={onRestart}
+                  >
+                    <RotateCcw size={16} />
                     Try again
-                  </Button>
+                  </button>
                   {won && hasNext && (
-                    <Button
-                      variant="contained"
-                      color="success"
-                      endIcon={<ArrowRight />}
+                    <button
+                      type="button"
+                      className="stone-btn stone-btn--sm stone-btn--gold"
+                      style={{ width: 'auto' }}
                       onClick={onNext}
                     >
                       Next level
-                    </Button>
+                      <ArrowRight size={16} />
+                    </button>
                   )}
                 </Stack>
-              </Stack>
-            </Paper>
+              </Box>
+            </Box>
           )}
         </Box>
 

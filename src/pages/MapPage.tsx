@@ -1,12 +1,18 @@
-import { useCallback } from 'react';
+import { type CSSProperties, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Button, Typography } from '@mui/material';
+import { Box, Typography } from '@mui/material';
 import { ArrowLeft } from 'lucide-react';
 import { PYRAMIDS, getPyramidOfLevel, type Pyramid } from '../levels/pyramids';
 import { useProgress } from '../game/useProgress';
 import { loadSave } from '../game/storage';
+import { boardTextures } from '../game/textures';
 import { LEVELS } from '../levels';
 import { WorldTrail } from '../components/map/WorldTrail';
+
+const STONE_VARS = {
+  '--frame-stone': boardTextures.frameStone,
+  '--tablet-stone': boardTextures.wallTop,
+} as CSSProperties;
 
 /** Resolve the pyramid the player is currently in (last-played, else the first). */
 function currentPyramid(): Pyramid {
@@ -29,7 +35,7 @@ export function MapPage() {
   const backTo = currentId ?? LEVELS[0].id;
 
   return (
-    <Box sx={{ position: 'fixed', inset: 0, overflow: 'hidden', bgcolor: '#14100a' }}>
+    <Box style={STONE_VARS} sx={{ position: 'fixed', inset: 0, overflow: 'hidden', bgcolor: '#14100a' }}>
       <WorldTrail
         pyramids={PYRAMIDS}
         activeIndex={activeIndex}
@@ -56,38 +62,41 @@ export function MapPage() {
           pointerEvents: 'none',
         }}
       >
-        <Button
-          startIcon={<ArrowLeft size={18} />}
+        <button
+          type="button"
+          className="stone-btn stone-btn--sm"
+          style={{ width: 'auto', pointerEvents: 'auto' }}
           onClick={() => navigate(`/play/${backTo}`)}
-          color="inherit"
-          sx={{
-            pointerEvents: 'auto',
-            color: 'text.primary',
-            bgcolor: 'rgba(16,11,6,0.88)',
-            border: '1px solid rgba(201,154,30,0.28)',
-            '&:hover': { bgcolor: 'rgba(30,22,12,0.95)' },
-          }}
         >
+          <ArrowLeft size={16} />
           Back to game
-        </Button>
+        </button>
         <Box
+          className="stone-slab"
           sx={{
             textAlign: 'right',
-            px: { xs: 1.25, sm: 1.75 },
-            py: { xs: 0.5, sm: 0.75 },
-            borderRadius: 1.5,
-            bgcolor: 'rgba(16,11,6,0.88)',
-            border: '1px solid rgba(201,154,30,0.28)',
+            px: { xs: 1.5, sm: 2 },
+            py: { xs: 0.75, sm: 1 },
+            pointerEvents: 'auto',
           }}
         >
           <Typography
             variant="h4"
-            color="primary"
-            sx={{ fontSize: { xs: '1.35rem', sm: '2rem' }, lineHeight: 1.1 }}
+            sx={{
+              fontSize: { xs: '1.35rem', sm: '2rem' },
+              lineHeight: 1.1,
+              fontWeight: 700,
+              color: '#f4d774',
+              letterSpacing: 0.5,
+              textShadow: '0 2px 0 rgba(0,0,0,0.6)',
+            }}
           >
             The Necropolis
           </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+          <Typography
+            variant="caption"
+            sx={{ display: { xs: 'none', sm: 'block' }, color: '#c9ad74', textShadow: '0 1px 0 rgba(0,0,0,0.5)' }}
+          >
             {PYRAMIDS.length} tombs · drag to explore
           </Typography>
         </Box>
