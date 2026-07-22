@@ -140,9 +140,9 @@ function grainOverlay(): string {
  */
 export const boardTextures = {
   floorA: encode(sandstoneTile('#d2b781', 0.0, 0.0, 7, 2)),
-  // B is the SAME sandstone, only a gentle shade darker — a soft two-tone, not a
-  // muddy contrasting tile.
-  floorB: encode(sandstoneTile('#c3a870', 0.0, 0.0, 19, 2)),
+  // B is the SAME sandstone, a clear shade darker — a readable two-tone, without
+  // tipping into the muddy brown that read as dirt.
+  floorB: encode(sandstoneTile('#b0945c', 0.0, 0.0, 19, 2)),
   wallTop: encode(sandstoneTile('#ccb184', -0.02, 0.04, 31, 2)),
   grain: encode(grainOverlay()),
 } as const;
