@@ -1,16 +1,30 @@
 /**
- * Procedural SFX engine for Maze Escape — Web Audio only, no audio files.
+ * Sample-based SFX engine for Maze Escape.
  *
- * Every sound is synthesized on the fly from oscillators / filtered noise with
- * short gain envelopes, so the whole thing is self-contained and CSP-safe (no
- * network, no blobs). A single AudioContext is created lazily on the first user
- * gesture and `resume()`d each time (autoplay policy). Everything is wrapped so
- * a missing or failed AudioContext degrades to silence and NEVER throws.
+ * Plays short recorded CC0 clips (Kenney, public domain — see src/assets/audio)
+ * through the Web Audio API: fetched once, decoded to AudioBuffers, then fired
+ * via BufferSource + gain. A single AudioContext is created lazily on the first
+ * user gesture and `resume()`d each time (autoplay policy); the same gesture
+ * warms (decodes) every sample so playback isn't silent on the first hit.
+ * Everything is wrapped so a missing/failed AudioContext — or a sample that
+ * hasn't decoded yet — degrades to silence and NEVER throws.
  *
  * Enablement is backed by `settings.sound` in the storage module: `isSoundEnabled`
  * lazily reads it, `setSoundEnabled` writes it (and keeps a local cache in sync).
  */
 import { loadSave, updateSave } from './storage';
+import blockedUrl from '../assets/audio/blocked.mp3';
+import hintUrl from '../assets/audio/hint.mp3';
+import keyUrl from '../assets/audio/key.mp3';
+import loseUrl from '../assets/audio/lose.mp3';
+import mergeUrl from '../assets/audio/merge.mp3';
+import monster1 from '../assets/audio/monster1.mp3';
+import monster2 from '../assets/audio/monster2.mp3';
+import monster3 from '../assets/audio/monster3.mp3';
+import step1 from '../assets/audio/step1.mp3';
+import step2 from '../assets/audio/step2.mp3';
+import step3 from '../assets/audio/step3.mp3';
+import winUrl from '../assets/audio/win.mp3';
 
 type Ctx = AudioContext;
 
@@ -64,6 +78,8 @@ function unlock(): void {
     src.buffer = c.createBuffer(1, 1, c.sampleRate);
     src.connect(c.destination);
     src.start(0);
+    // Same gesture: warm every sample so the first real hit isn't silent.
+    preloadAll(c);
   } catch {
     // Unlock is best-effort.
   }
@@ -115,63 +131,86 @@ export function setSoundEnabled(on: boolean): void {
 // Arm the gesture-based unlock as soon as this module loads on the client.
 installUnlock();
 
-// --- low-level voices -------------------------------------------------------
+// --- sample playback --------------------------------------------------------
 
-interface ToneOpts {
-  readonly type?: OscillatorType;
-  readonly gain?: number;
-  /** Optional end frequency for a linear glide. */
-  readonly to?: number;
-  /** Delay before the tone starts (s), for arpeggios. */
-  readonly at?: number;
-}
+/**
+ * Each game event maps to one or more CC0 sample URLs. Where there are several
+ * (footsteps, the monster shuffle) a random one is picked per play so repeats
+ * don't sound mechanical.
+ */
+const SAMPLES = {
+  step: [step1, step2, step3],
+  blockedWait: [blockedUrl],
+  monster: [monster1, monster2, monster3],
+  key: [keyUrl],
+  merge: [mergeUrl],
+  win: [winUrl],
+  lose: [loseUrl],
+  hint: [hintUrl],
+} as const;
 
-/** A single enveloped oscillator blip. */
-function tone(freq: number, dur: number, opts: ToneOpts = {}): void {
-  const c = audio();
-  if (!c) return;
-  try {
-    const t0 = c.currentTime + (opts.at ?? 0);
-    const osc = c.createOscillator();
-    const g = c.createGain();
-    const peak = opts.gain ?? 0.12;
-    osc.type = opts.type ?? 'sine';
-    osc.frequency.setValueAtTime(freq, t0);
-    if (opts.to !== undefined) osc.frequency.linearRampToValueAtTime(opts.to, t0 + dur);
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(peak, t0 + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    osc.connect(g).connect(c.destination);
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.02);
-  } catch {
-    // Never let a failed voice bubble up into gameplay.
+const ALL_URLS = [...new Set(Object.values(SAMPLES).flat())];
+
+const rawCache = new Map<string, Promise<ArrayBuffer>>();
+const bufCache = new Map<string, AudioBuffer>();
+const decoding = new Set<string>();
+
+/** Fetch a sample's bytes once (cached); a failed fetch clears so it can retry. */
+function fetchRaw(url: string): Promise<ArrayBuffer> {
+  let p = rawCache.get(url);
+  if (!p) {
+    p = fetch(url).then((r) => r.arrayBuffer());
+    p.catch(() => rawCache.delete(url));
+    rawCache.set(url, p);
   }
+  return p;
 }
 
-/** A short filtered white-noise burst (thuds / merges). */
-function noise(dur: number, gain: number, cutoff: number): void {
+/** Fetch + decode a sample into an AudioBuffer (cached). Best-effort/silent. */
+function decodeSample(c: Ctx, url: string): void {
+  if (bufCache.has(url) || decoding.has(url)) return;
+  decoding.add(url);
+  fetchRaw(url)
+    // decodeAudioData may detach its input, so decode a copy and keep the cache.
+    .then((raw) => c.decodeAudioData(raw.slice(0)))
+    .then((buf) => {
+      bufCache.set(url, buf);
+    })
+    .catch(() => {})
+    .finally(() => decoding.delete(url));
+}
+
+/** Warm every sample once the context is live (called from the gesture unlock). */
+function preloadAll(c: Ctx): void {
+  for (const url of ALL_URLS) decodeSample(c, url);
+}
+
+interface PlayOpts {
+  readonly gain?: number;
+  /** Slight random pitch shift so repeated footsteps/shuffles vary. */
+  readonly vary?: boolean;
+}
+
+/** Play one of `urls` (random pick) through a gain node. Silent if not decoded. */
+function playSample(urls: readonly string[], opts: PlayOpts = {}): void {
   const c = audio();
   if (!c) return;
+  const url = urls.length === 1 ? urls[0] : urls[(Math.random() * urls.length) | 0];
+  const buf = bufCache.get(url);
+  if (!buf) {
+    decodeSample(c, url); // decode now; this hit is silent, the next will land
+    return;
+  }
   try {
-    const frames = Math.max(1, Math.floor(c.sampleRate * dur));
-    const buf = c.createBuffer(1, frames, c.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1;
     const src = c.createBufferSource();
     src.buffer = buf;
-    const lp = c.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = cutoff;
+    if (opts.vary) src.playbackRate.value = 0.93 + Math.random() * 0.14;
     const g = c.createGain();
-    const t0 = c.currentTime;
-    g.gain.setValueAtTime(gain, t0);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-    src.connect(lp).connect(g).connect(c.destination);
-    src.start(t0);
-    src.stop(t0 + dur + 0.02);
+    g.gain.value = opts.gain ?? 0.5;
+    src.connect(g).connect(c.destination);
+    src.start();
   } catch {
-    // Silence on failure.
+    // A failed voice must never bubble up into gameplay.
   }
 }
 
@@ -181,35 +220,25 @@ function play(fn: () => void): void {
   fn();
 }
 
-// --- public SFX (subtle + distinct) ----------------------------------------
+// --- public SFX (recorded CC0 clips — Kenney, public domain) ----------------
 
 export const sfx = {
-  /** Player hop: a soft high tick. */
-  step: () => play(() => tone(640, 0.06, { type: 'triangle', gain: 0.06 })),
-  /** A blocked move / wait: a duller low tick. */
-  blockedWait: () => play(() => tone(200, 0.08, { type: 'square', gain: 0.05 })),
-  /** Monster sub-step: a subtle low thump (throttled by the caller). */
-  monster: () => play(() => tone(150, 0.07, { type: 'triangle', gain: 0.05 })),
-  /** Key pickup / gate toggle: a bright ping. */
-  key: () => play(() => tone(1180, 0.14, { type: 'sine', gain: 0.09, to: 1560 })),
-  /** Monster collision: a noisy thud. */
-  merge: () => play(() => {
-    noise(0.16, 0.18, 900);
-    tone(110, 0.16, { type: 'square', gain: 0.06 });
-  }),
-  /** Win: a short rising arpeggio. */
-  win: () => play(() => {
-    tone(523, 0.16, { type: 'triangle', gain: 0.1, at: 0 });
-    tone(659, 0.16, { type: 'triangle', gain: 0.1, at: 0.11 });
-    tone(784, 0.28, { type: 'triangle', gain: 0.11, at: 0.22 });
-  }),
-  /** Lose: a descending tone. */
-  lose: () => play(() => tone(420, 0.42, { type: 'sawtooth', gain: 0.09, to: 130 })),
-  /** Hint revealed: a gentle two-note chime. */
-  hint: () => play(() => {
-    tone(880, 0.12, { type: 'sine', gain: 0.07, at: 0 });
-    tone(1320, 0.18, { type: 'sine', gain: 0.07, at: 0.09 });
-  }),
+  /** Player hop: a stone footstep. */
+  step: () => play(() => playSample(SAMPLES.step, { gain: 0.5, vary: true })),
+  /** A blocked move / wait: a soft muffled bump. */
+  blockedWait: () => play(() => playSample(SAMPLES.blockedWait, { gain: 0.4 })),
+  /** Monster sub-step: a dry cloth/bandage shuffle (throttled by the caller). */
+  monster: () => play(() => playSample(SAMPLES.monster, { gain: 0.4, vary: true })),
+  /** Key pickup / gate toggle: a metal latch. */
+  key: () => play(() => playSample(SAMPLES.key, { gain: 0.6 })),
+  /** Monster collision: a heavy soft thud. */
+  merge: () => play(() => playSample(SAMPLES.merge, { gain: 0.85 })),
+  /** Win: a resonant temple bong. */
+  win: () => play(() => playSample(SAMPLES.win, { gain: 0.7 })),
+  /** Lose: a low wooden thud. */
+  lose: () => play(() => playSample(SAMPLES.lose, { gain: 0.75 })),
+  /** Hint revealed: a gentle glass chime. */
+  hint: () => play(() => playSample(SAMPLES.hint, { gain: 0.55 })),
 };
 
 /** Test-only seam: reset cached state between cases. */
