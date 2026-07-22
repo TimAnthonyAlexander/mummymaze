@@ -17,18 +17,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import {
   type Pyramid,
+  currentObjectiveId,
   progressionOrder,
   pyramidLevelIds,
 } from '../levels/pyramids';
 import { clearSave, loadSave, saveSave, type SaveData } from './storage';
 
 const PROGRESSION = progressionOrder();
-const FIRST_LEVEL_ID = PROGRESSION[0];
-
-/** The first not-yet-completed level in progression order, or undefined if all done. */
-function frontierOf(completed: Set<string>): string | undefined {
-  return PROGRESSION.find((id) => !completed.has(id));
-}
 
 export interface PyramidProgress {
   /** True once the pyramid's base (first) level is unlocked. */
@@ -64,15 +59,16 @@ export function useProgress(): Progress {
 
   const completed = useMemo(() => new Set(save.completedLevelIds), [save.completedLevelIds]);
 
-  // The frontier and the unlocked set are DERIVED — never stored.
-  const currentLevelId = useMemo(() => frontierOf(completed), [completed]);
+  // Objective + unlocked set are DERIVED from the completed set — never stored.
+  // The objective is the level after the FURTHEST completed one (not the first
+  // gap), so an early skipped level never sends you back to the start.
+  const currentLevelId = useMemo(() => currentObjectiveId(completed), [completed]);
   const unlocked = useMemo(() => {
-    const s = new Set(completed);
-    // Everything completed is playable; the single frontier is the only other
-    // unlocked level. (Before anything is done, that's the very first level.)
-    s.add(currentLevelId ?? FIRST_LEVEL_ID);
-    return s;
-  }, [completed, currentLevelId]);
+    // Everything up to AND INCLUDING the objective is playable — completed levels
+    // (replay), any skipped levels along the way, and the objective itself.
+    const objIdx = currentLevelId ? PROGRESSION.indexOf(currentLevelId) : PROGRESSION.length - 1;
+    return new Set(PROGRESSION.slice(0, objIdx + 1));
+  }, [currentLevelId]);
 
   const isUnlocked = useCallback((id: string) => unlocked.has(id), [unlocked]);
 

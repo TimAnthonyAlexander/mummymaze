@@ -145,7 +145,7 @@ export function GamePage() {
       <MobileShell
         pyramid={pyramid}
         pyramidProgress={pyramidProgress}
-        currentId={level.id}
+        currentId={progress.currentLevelId ?? level.id}
         state={state}
         render={render}
         canUndo={game.canUndo}
@@ -175,7 +175,7 @@ export function GamePage() {
       <Sidebar
         pyramid={pyramid}
         pyramidProgress={pyramidProgress}
-        currentId={level.id}
+        currentId={progress.currentLevelId ?? level.id}
         state={state}
         canUndo={game.canUndo}
         animating={animating}

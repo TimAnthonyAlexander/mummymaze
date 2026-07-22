@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { LEVELS, getLevel } from './levels';
-import { progressionOrder } from './levels/pyramids';
+import { currentObjectiveId } from './levels/pyramids';
 import { GamePage } from './pages/GamePage';
 import { MapPage } from './pages/MapPage';
 import { EditorPage } from './pages/EditorPage';
@@ -14,9 +14,8 @@ import { loadSave } from './game/storage';
  * level, then level 1 (e.g. once the whole pack is cleared).
  */
 function initialLevelId(): string {
-  const completed = new Set(loadSave().completedLevelIds);
-  const frontier = progressionOrder().find((id) => !completed.has(id));
-  if (frontier) return frontier;
+  const objective = currentObjectiveId(new Set(loadSave().completedLevelIds));
+  if (objective) return objective;
   const lastId = loadSave().lastPlayedLevelId;
   if (lastId && getLevel(lastId)) return lastId;
   return LEVELS[0].id;

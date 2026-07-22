@@ -220,7 +220,9 @@ export function PyramidSprite({
       // Per-block state — NOT forced to 'locked' for the whole pyramid, so a
       // pyramid you've partly cleared keeps its completed levels replayable.
       const state = stateOf(id);
-      if ((state === 'available' || state === 'current') && !torch) {
+      // The explorer marks ONLY the single current objective — never a skipped
+      // ('available') level — so exactly one head shows across the whole map.
+      if (state === 'current' && !torch) {
         torch = { cx: rect.x + rect.w / 2, topY: rect.y };
       }
       blocks.push(

@@ -169,6 +169,23 @@ export function nextInProgression(levelId: string): string | undefined {
   return i >= 0 && i < PROGRESSION.length - 1 ? PROGRESSION[i + 1] : undefined;
 }
 
+/** Progression index of the FURTHEST completed level, or -1 if none completed. */
+export function furthestCompletedIndex(completed: ReadonlySet<string>): number {
+  let last = -1;
+  for (let i = 0; i < PROGRESSION.length; i++) if (completed.has(PROGRESSION[i])) last = i;
+  return last;
+}
+
+/**
+ * The current objective: the level right AFTER the furthest completed one — so an
+ * early skipped level never drags the objective backwards. This is what "open the
+ * game" and the map marker resolve to. Undefined once the whole pack is cleared.
+ */
+export function currentObjectiveId(completed: ReadonlySet<string>): string | undefined {
+  const next = furthestCompletedIndex(completed) + 1;
+  return next < PROGRESSION.length ? PROGRESSION[next] : undefined;
+}
+
 /** The pyramid that contains `levelId`, or undefined if it is unknown. */
 export function getPyramidOfLevel(levelId: string): Pyramid | undefined {
   return PYRAMIDS.find((p) => p.rows.some((row) => row.includes(levelId)));
