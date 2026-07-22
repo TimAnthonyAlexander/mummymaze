@@ -28,6 +28,8 @@ interface ControlsProps {
   onShowSolution?: () => void;
   /** Compact (mobile): collapse Undo/Restart/Hint/Solution into an icon-button row. */
   compact?: boolean;
+  /** Show the directional wheel. Off on desktop (arrow keys / WASD move instead). */
+  showWheel?: boolean;
 }
 
 const DIR_LABEL: Record<Action, string> = {
@@ -138,12 +140,15 @@ export function Controls({
   onHint,
   onShowSolution,
   compact = false,
+  showWheel = true,
 }: ControlsProps) {
   const showHintButtons = Boolean(onHint || onShowSolution);
 
   return (
     <Stack sx={{ alignItems: 'center', gap: 1.5 }}>
-      {/* Directional cluster: a 3×3 template with a cohesive tile treatment. */}
+      {/* Directional cluster: a 3×3 template with a cohesive tile treatment.
+          Hidden on desktop, where arrow keys / WASD move the explorer. */}
+      {showWheel && (
       <Box
         sx={{
           display: 'grid',
@@ -208,6 +213,7 @@ export function Controls({
           <ArrowDown size={22} />
         </PadButton>
       </Box>
+      )}
 
       {compact ? (
         /* Mobile: one tight row of icon buttons + tooltips. */
