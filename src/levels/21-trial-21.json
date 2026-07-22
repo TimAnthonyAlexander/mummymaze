@@ -4,61 +4,57 @@
   "width": 6,
   "height": 6,
   "start": {
-    "x": 3,
+    "x": 1,
     "y": 4
   },
   "exit": {
-    "x": 4,
-    "y": 5,
-    "dir": "S"
+    "x": 0,
+    "y": 2,
+    "dir": "W"
   },
   "walls": [
     {
-      "x": 3,
+      "x": 0,
       "y": 1,
-      "dir": "S"
+      "dir": "E"
     },
     {
-      "x": 1,
-      "y": 3,
+      "x": 2,
+      "y": 2,
       "dir": "S"
     },
     {
       "x": 3,
-      "y": 3,
-      "dir": "S"
+      "y": 2,
+      "dir": "E"
     },
     {
       "x": 0,
+      "y": 3,
+      "dir": "S"
+    },
+    {
+      "x": 3,
       "y": 4,
-      "dir": "E"
-    }
-  ],
-  "gates": [
+      "dir": "S"
+    },
     {
-      "x": 4,
-      "y": 2,
-      "dir": "S",
-      "open": false
-    }
-  ],
-  "keys": [
-    {
-      "x": 1,
-      "y": 0
+      "x": 5,
+      "y": 4,
+      "dir": "S"
     }
   ],
   "monsters": [
     {
       "kind": "scorpion_white",
-      "x": 4,
+      "x": 2,
       "y": 4
     },
     {
       "kind": "mummy_white",
-      "x": 0,
-      "y": 2
+      "x": 3,
+      "y": 5
     }
   ],
-  "par": 3
+  "par": 4
 }

@@ -33,6 +33,17 @@
  * there. `curriculumFailures(level, index, requireForbid)` encodes this: the
  * generator passes `requireForbid = index < 6`.
  *
+ * KEY POLICY
+ * ----------
+ * A key on the board ALWAYS means something. There are no decorative keys. A
+ * generated level either (a) is a real LOCK-AND-KEY — the exit tile is sealed so
+ * its only interior entrance is a single closed gate, and the key that opens it
+ * sits elsewhere — or (b) carries no key at all. Lock-and-key levels are placed
+ * at a spread ~1-in-4 cadence (`isKeyLevel`: every 4th global play index, never a
+ * dark apex), joining the hand-authored level 09. Each is VERIFIED with
+ * `generator.keyRequired`: solvable, but UNsolvable once the key is removed, so
+ * the key is mechanically necessary no matter who trips it (player or monster).
+ *
  * STRUCTURE
  * ---------
  *   Levels 1-9  : HAND-AUTHORED teaching puzzles, one new idea at a time
@@ -41,9 +52,10 @@
  *                 coordinates were found by searching for layouts that pass all
  *                 filters, then frozen here. `par` is filled from the solver at
  *                 build time so it can never drift from the layout.
- *   Levels 10-12: GENERATED combinations on bigger boards (more hunters, traps,
- *                 a key+gate), each drawn until it passes the SAME curriculum
- *                 filters. Merge allowed (index >= 6).
+ *   Levels 10-12: GENERATED combinations on bigger boards (more hunters, traps;
+ *                 a lock-and-key when `isKeyLevel` designates the slot), each
+ *                 drawn until it passes the SAME curriculum filters. Merge
+ *                 allowed (index >= 6).
  *
  * Reproducible: a seeded mulberry32 PRNG with a FIXED base seed drives all
  * generated randomness, so a given mode+state always yields the same pack.
@@ -218,33 +230,39 @@ const GEN_SLOTS = [
     // teaching pyramid ends in the dark. Board stays 8 so a radius-2 torch leaves
     // most of it unseen.
     name: 'Ambush',
-    mechanic: 'Mummy + scorpion + a trap and a key, in the dark',
+    mechanic: 'Mummy + scorpion + a trap, in the dark',
     size: 8,
     monsters: ['mummy_white', 'scorpion_red'],
     wallDensity: 0.06,
     traps: 1,
-    key: true,
     dark: true,
   },
   {
     name: 'The Warren',
-    mechanic: 'Three hunters, walls, two traps and a key',
+    mechanic: 'Three hunters, walls and two traps',
     size: 8,
     monsters: ['mummy_white', 'mummy_red', 'scorpion_white'],
     wallDensity: 0.06,
     traps: 2,
-    key: true,
   },
   {
     name: 'Final Trial',
-    mechanic: 'Everything at once: three hunters, walls, traps and a key on the largest board',
+    mechanic: 'Everything at once: three hunters, walls and traps on the largest board',
     size: 9,
     monsters: ['mummy_white', 'mummy_red', 'scorpion_red'],
     wallDensity: 0.08,
     traps: 2,
-    key: true,
   },
 ];
+
+// A generated level is a genuine LOCK-AND-KEY (sealed exit, key required) at a
+// spread ~1-in-4 cadence — every 4th global play index — EXCEPT a dark apex (a
+// key is unreadable under a radius-2 torch). Hand-authored level 09 is the other
+// key level. Non-designated generated levels carry NO key: a key on the board
+// always means something. `dark` (a dark apex) never gets a key.
+function isKeyLevel(idx, dark) {
+  return idx % 4 === 2 && !dark;
+}
 
 const KIND_ROTATION = ['scorpion_white', 'mummy_white', 'mummy_red', 'scorpion_red'];
 
@@ -253,9 +271,10 @@ function requiresForbid(index) {
   return index < 6;
 }
 
-/** Build generate-options from a GEN_SLOTS entry. */
-function optsFromSlot(slot, id) {
+/** Build generate-options from a GEN_SLOTS entry at global play `index`. */
+function optsFromSlot(slot, id, index) {
   const size = slot.size;
+  const wantKey = isKeyLevel(index, !!slot.dark);
   return {
     id,
     name: slot.name,
@@ -264,7 +283,7 @@ function optsFromSlot(slot, id) {
     monsters: slot.monsters,
     wallDensity: slot.wallDensity,
     traps: slot.traps,
-    key: slot.key,
+    requireKey: wantKey,
     // Keep the exit only mildly distant so par does not balloon; enemy CLOSENESS
     // is enforced by the proximity filter, not by pushing the exit away.
     minStartExitDistance: 2,
@@ -341,7 +360,11 @@ function tierPlan(idx) {
   const center = 14 + (t - 1) * 2.2 + pos * 1.8;
   const floor = isApex ? 8 : 12;
 
-  return { pyramid, pos, size, monsters, wallDensity, traps, center, floor, dark: isApex };
+  // ~1-in-4 levels are a real lock-and-key (sealed exit, key required); a dark
+  // apex never is (a key is unreadable under a torch). Others carry no key.
+  const key = isKeyLevel(idx, isApex);
+
+  return { pyramid, pos, size, monsters, wallDensity, traps, center, floor, dark: isApex, key };
 }
 
 // ===========================================================================
@@ -484,11 +507,19 @@ function writeSpec(numStr, spec) {
  * filter, and throw with a clear message if any fails. Returns
  * { level, par, difficulty, check }.
  */
-function finalize(eng, gen, spec, index) {
+function finalize(eng, gen, spec, index, requireKey = false) {
   const level = eng.loadLevel(spec);
   const fails = gen.curriculumFailures(level, index, requiresForbid(index));
   if (fails.length) {
     throw new Error(`level "${spec.id}" (index ${index}) fails curriculum filters: ${fails.join('; ')}`);
+  }
+  // A designated lock-and-key level must be genuinely key-gated: solvable, but
+  // UNsolvable once the key is removed. Guards against a key that turned out
+  // optional (e.g. a random wall opened a bypass around the sealed chamber).
+  if (requireKey && !gen.keyRequired(level, { cap: EXTEND_CAP })) {
+    throw new Error(
+      `level "${spec.id}" (index ${index}) was meant to REQUIRE the key but is solvable without it`,
+    );
   }
   const r = eng.solve(level);
   const difficulty = eng.scoreDifficulty(level);
@@ -549,7 +580,9 @@ function drawTierLevel(eng, gen, idx, plan, id, name, rng, existingSignatures, f
     monsters: plan.monsters,
     wallDensity: plan.wallDensity,
     traps: plan.traps,
-    key: plan.key ?? true,
+    // A designated key level is a real, verified lock-and-key; everything else
+    // carries no key at all (no more decorative gates).
+    requireKey: plan.key ?? false,
     minStartExitDistance: 2,
     attempts: 90,
     cap: EXTEND_CAP,
@@ -734,13 +767,14 @@ async function runGenerate(eng, gen) {
   for (const slot of GEN_SLOTS) {
     const num = String(index + 1).padStart(2, '0');
     const id = `${num}-${slugify(slot.name)}`;
-    const opts = optsFromSlot(slot, id);
+    const opts = optsFromSlot(slot, id, index);
+    const wantKey = isKeyLevel(index, !!slot.dark);
 
     const cand = drawCurriculumRising(eng, gen, opts, index, rng, prevDiff, existingSignatures);
     if (!cand) throw new Error(`failed to generate a curriculum-passing level for slot ${num} (${slot.name})`);
 
     const spec = { ...cand.spec, id, name: slot.name, ...(slot.dark ? { dark: { radius: DARK_RADIUS } } : {}) };
-    const { par, difficulty, check } = finalize(eng, gen, spec, index);
+    const { par, difficulty, check } = finalize(eng, gen, spec, index, wantKey);
     const finalSpec = { ...spec, par };
     existingSignatures.add(signature(finalSpec));
     writeSpec(num, finalSpec);
@@ -810,7 +844,7 @@ async function runExtend(eng, gen, count) {
       // pyramid ends in the dark. Darkness is view-only, so the same solvability
       // filters already passed above still hold.
       const spec = { ...cand.spec, id, name, ...(plan.dark ? { dark: { radius: DARK_RADIUS } } : {}) };
-      const { par, difficulty, check } = finalize(eng, gen, spec, levelIndex);
+      const { par, difficulty, check } = finalize(eng, gen, spec, levelIndex, !!plan.key);
       const finalSpec = { ...spec, par };
       existingSignatures.add(signature(finalSpec));
       writeSpec(num, finalSpec);

@@ -199,6 +199,14 @@ no engine/mechanics changed. Key pieces:
   collision rule**, **not** beeline-trivial, enemy close, `par > manhattan`.
   Merges are never *required* in levels 1–6; from level 7 a merge may be part of
   the intended solution.
+- **Key policy: no decorative keys.** A generated level either is a real
+  LOCK-AND-KEY (the exit tile is sealed so its only interior entrance is one
+  closed gate; a key elsewhere opens it) or carries no key at all. Lock-and-key
+  levels land at a ~1-in-4 cadence (`isKeyLevel` in `generate-levels.mjs`: every
+  4th global index, never a dark apex) plus the hand-authored level 09, and are
+  verified by `generator.keyRequired` (the `requireKey` generate option):
+  solvable, but UNsolvable with the key removed, so the key is on the only
+  winning path no matter who trips it. Random/decorative gates are gone.
 - **Board size ramps base→apex within each pyramid** (fewer squares on the lower
   rungs, biggest at the apex — echoing the original's 6/8/10 lattices), set in
   `tierPlan` in `scripts/generate-levels.mjs`. **Every pyramid's APEX (top rung)

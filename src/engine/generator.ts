@@ -14,6 +14,7 @@ import type { EdgeSpec, GateSpec, LevelSpec, MonsterSpec } from './level';
 import { scoreDifficulty } from './difficulty';
 import type { DifficultyResult } from './difficulty';
 import { solve } from './solver';
+import type { SolveOptions } from './solver';
 import { canCross, neighbor as neighborOf, samePos } from './board';
 import { initGame, step } from './step';
 import type { Action, Dir, Level, MonsterKind, Pos } from './types';
@@ -29,8 +30,19 @@ export interface GenerateOptions {
   readonly wallDensity?: number;
   /** Number of trap tiles. */
   readonly traps?: number;
-  /** If true, place one key tile and one (initially closed) gate. */
+  /** If true, place one key tile and one (initially closed) gate on a random
+   * interior edge. Decorative: the gate rarely blocks the only route, so the
+   * key is usually optional. For a GENUINELY required key, use `requireKey`. */
   readonly key?: boolean;
+  /**
+   * If true, build a real LOCK-AND-KEY: seal the exit tile so its only interior
+   * entrance is a single closed gate, and drop a key elsewhere. The exit is then
+   * unreachable until the key opens that gate. Every such candidate is verified
+   * with `keyRequired` (solvable, but UNsolvable once the key is removed), so the
+   * key is mechanically necessary — not decoration. Mirrors the hand-authored
+   * "Lock & Key" teaching level. Implies a key+gate (ignores `key`).
+   */
+  readonly requireKey?: boolean;
   /** Inclusive target difficulty band. */
   readonly minDifficulty?: number;
   readonly maxDifficulty?: number;
@@ -109,6 +121,19 @@ function manhattan(a: Pos, b: Pos): number {
   return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
+/**
+ * Order-independent identity for the physical edge `(x,y)->dir`: the same edge
+ * addressed from either cell yields the same key. Used to detect a wall and a
+ * gate that occupy the SAME edge (a wall there would block it regardless of the
+ * gate, since canCross tests the wall first).
+ */
+function edgeKey(x: number, y: number, dir: Dir): string {
+  const nb = neighborOf({ x, y }, dir);
+  const a = `${x},${y}`;
+  const b = `${nb.x},${nb.y}`;
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
 /** Build a single candidate LevelSpec (unsolved / unchecked). */
 function buildSpec(opts: GenerateOptions, rng: RNG): LevelSpec | null {
   const { width: w, height: h } = opts;
@@ -131,7 +156,7 @@ function buildSpec(opts: GenerateOptions, rng: RNG): LevelSpec | null {
 
   // Walls: for each interior edge (each cell's E and S neighbor), maybe wall it.
   const density = opts.wallDensity ?? 0;
-  const walls: EdgeSpec[] = [];
+  let walls: EdgeSpec[] = [];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (x + 1 < w && rng() < density) walls.push({ x, y, dir: 'E' });
@@ -154,10 +179,43 @@ function buildSpec(opts: GenerateOptions, rng: RNG): LevelSpec | null {
     }
   }
 
-  // Optional key + gate.
+  // Key + gate. Two modes (see GenerateOptions):
+  //   requireKey — a real lock-and-key: seal the exit tile so its only interior
+  //     entrance is one closed gate, then drop a key elsewhere. Verified later by
+  //     `keyRequired`, so the key is mechanically necessary, not decoration.
+  //   key — legacy/decorative: a key + a gate on a random interior edge.
   const keys: Pos[] = [];
   const gates: GateSpec[] = [];
-  if (opts.key) {
+  if (opts.requireKey) {
+    const exitTile: Pos = { x: exit.x, y: exit.y };
+    // Interior edges of the exit tile (in-bounds neighbor), minus the exit edge.
+    const interiorDirs = (['N', 'E', 'S', 'W'] as Dir[]).filter(
+      (d) => d !== exit.dir && inBounds(w, h, neighborOf(exitTile, d)),
+    );
+    if (interiorDirs.length === 0) return null; // exit can't be gated on this board
+    const gateDir = pick(rng, interiorDirs);
+    // Seal every OTHER interior edge of the exit tile: the gate is the sole way in.
+    for (const d of interiorDirs) {
+      if (d !== gateDir) walls.push({ x: exit.x, y: exit.y, dir: d });
+    }
+    // Drop any random wall already sitting on the gate edge — a wall there blocks
+    // the edge regardless of the gate (canCross tests the wall first), which would
+    // make the exit permanently unreachable.
+    const gateEK = edgeKey(exit.x, exit.y, gateDir);
+    walls = walls.filter((wl) => edgeKey(wl.x, wl.y, wl.dir) !== gateEK);
+    gates.push({ x: exit.x, y: exit.y, dir: gateDir, open: false });
+    // Key: any tile that is not the start, a trap, or the (now sealed) exit tile.
+    used.add(posKey(exitTile));
+    for (let t = 0; t < 80; t++) {
+      const p: Pos = { x: randInt(rng, w), y: randInt(rng, h) };
+      const k = posKey(p);
+      if (used.has(k)) continue;
+      used.add(k);
+      keys.push(p);
+      break;
+    }
+    if (keys.length === 0) return null;
+  } else if (opts.key) {
     for (let t = 0; t < 50; t++) {
       const p: Pos = { x: randInt(rng, w), y: randInt(rng, h) };
       const k = posKey(p);
@@ -178,9 +236,11 @@ function buildSpec(opts: GenerateOptions, rng: RNG): LevelSpec | null {
     }
   }
 
-  // Monsters: random tiles, never the start, no two on the same tile.
+  // Monsters: random tiles, never the start or a key tile, no two on the same
+  // tile (and, for a sealed lock-and-key, never trapped inside the exit chamber).
   const monsters: MonsterSpec[] = [];
-  const monUsed = new Set<string>([startKey]);
+  const monUsed = new Set<string>([startKey, ...keys.map(posKey)]);
+  if (opts.requireKey) monUsed.add(posKey({ x: exit.x, y: exit.y }));
   for (const kind of opts.monsters) {
     let placed = false;
     for (let t = 0; t < 100 && !placed; t++) {
@@ -252,6 +312,11 @@ export function generateLevelDetailed(
       if (!noMerge.solvable) continue;
     }
 
+    // Lock-and-key guarantee: the key must be mechanically REQUIRED — the level
+    // is solvable, but removing the key (so the gate can never open) makes it
+    // unsolvable. Rejects any candidate where the exit is reachable without it.
+    if (opts.requireKey && !keyRequired(level, solveOpts)) continue;
+
     const difficulty = scoreDifficulty(level, cap ?? 200_000);
     if (difficulty.score < min || difficulty.score > max) continue;
 
@@ -278,6 +343,31 @@ export function generateLevelDetailed(
 export function generateLevel(opts: GenerateOptions, rng: RNG): Level | null {
   const detailed = generateLevelDetailed(opts, rng);
   return detailed ? detailed.level : null;
+}
+
+/** A copy of `level` with every key tile cleared (gates can then never toggle). */
+function withoutKeys(level: Level): Level {
+  return {
+    ...level,
+    cells: level.cells.map((row) => row.map((c) => (c.key ? { ...c, key: false } : c))),
+  };
+}
+
+/**
+ * Is the key MECHANICALLY REQUIRED to win? Exact and faithful: the level is
+ * solvable, but the same level with every key removed — so the closed gate can
+ * never open — is UNsolvable. This holds no matter WHO trips the key (player or a
+ * monster): if removing it makes the exit unreachable, the key is on the only
+ * winning path. A level with no key or no gate is trivially not "key-required".
+ *
+ * `opts` (cap / forbidCollisions) are threaded into both solver calls so the
+ * check uses the same budget as generation.
+ */
+export function keyRequired(level: Level, opts: SolveOptions = {}): boolean {
+  const hasKey = level.cells.some((row) => row.some((c) => c.key));
+  if (!hasKey || level.gates.length === 0) return false;
+  if (!solve(level, opts).solvable) return false;
+  return !solve(withoutKeys(level), opts).solvable;
 }
 
 // ===========================================================================
