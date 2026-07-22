@@ -241,7 +241,10 @@ const BoardStaticOverlay = memo(function BoardStaticOverlay({
     <>
       <div className="board__ao" style={{ width: w, height: h }} aria-hidden="true" />
       <div className="board__grain" style={{ width: w, height: h }} aria-hidden="true" />
-      <ExitOpening pos={level.exit.pos} dir={level.exit.dir} cell={cell} />
+      {/* On dark levels the exit is drawn ABOVE the dark overlay instead (see the
+          dark block in Board), so it stays visible; omit it here to avoid a hidden
+          duplicate under the black. */}
+      {!level.dark && <ExitOpening pos={level.exit.pos} dir={level.exit.dir} cell={cell} />}
     </>
   );
 });
@@ -512,6 +515,12 @@ export function Board({
               style={spriteStyle(level.exit.pos, cell)}
               aria-hidden="true"
             />
+            {/* The exit stays visible THROUGH the dark so the goal is always
+                locatable — drawn above the black overlay (see BoardStaticOverlay,
+                which omits it on dark levels to avoid a hidden duplicate). */}
+            <div className="exit-in-dark">
+              <ExitOpening pos={level.exit.pos} dir={level.exit.dir} cell={cell} />
+            </div>
           </>
         )}
 

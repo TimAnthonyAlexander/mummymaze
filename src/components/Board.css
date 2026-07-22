@@ -482,8 +482,8 @@
     circle at var(--light-x) var(--light-y),
     transparent 0,
     transparent var(--light-r),
-    rgba(6, 5, 3, 0.6) calc((var(--light-r) + var(--light-r2)) / 2),
-    rgba(6, 5, 3, 0.98) var(--light-r2)
+    rgba(6, 5, 3, 0.72) calc((var(--light-r) + var(--light-r2)) / 2),
+    rgb(6, 5, 3) var(--light-r2)
   );
 }
 @media (prefers-reduced-motion: no-preference) {
@@ -494,8 +494,20 @@
   }
 }
 
+/* On dark levels the exit staircase is drawn ABOVE the black overlay (below the
+   sprites) so the way out is ALWAYS visible, however far it sits in the dark.
+   z-index 5 + rendered after .board__dark → paints over it; monsters (6) /
+   player (7) still pass in front. */
+.exit-in-dark {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
 /* A warm daylight glow bleeding in from the exit — always visible through the
-   dark so the player knows which way is out, without revealing the walls. */
+   dark so the player knows which way is out. */
 .exit-beacon {
   position: absolute;
   width: var(--cell);
