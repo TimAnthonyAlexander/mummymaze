@@ -33,8 +33,6 @@ const C = {
   sand: '#caa763',
   sandHi: '#e0c489',
   sandDark: '#8a6f3a',
-  flame: '#ffcf6b',
-  flameCore: '#fff2cf',
 };
 
 interface Rect {
@@ -139,14 +137,33 @@ function Block({
   );
 }
 
-/** A lit torch flame that marks the block the player should tackle next. */
-function Torch({ cx, topY, s }: { cx: number; topY: number; s: number }) {
-  const fy = topY - s * 0.18;
+/**
+ * A small explorer head (pith helmet) marking the block the player should tackle
+ * next — the current step. Reuses ExplorerSprite's head art (its 64-viewBox head
+ * box centres ~(32, 14.75) and is ~20.5 tall) so the cast reads as one set, drawn
+ * emerging FROM the sandstone block (not floating above it like the old torch).
+ */
+function ExplorerHead({ cx, cy, s }: { cx: number; cy: number; s: number }) {
+  const helm = '#d8cba2';
+  const helmLt = '#efe6c8';
+  const helmSh = '#a99b6f';
+  const skin = '#cf9f70';
+  const H = s * 1.05;
+  const k = H / 20.5;
   return (
-    <g filter="url(#torchGlow)">
-      <line x1={cx} y1={topY} x2={cx} y2={fy} stroke="#3a2913" strokeWidth={Math.max(1, s * 0.06)} />
-      <ellipse cx={cx} cy={fy - s * 0.12} rx={s * 0.14} ry={s * 0.22} fill={C.flame} />
-      <ellipse cx={cx} cy={fy - s * 0.14} rx={s * 0.07} ry={s * 0.12} fill={C.flameCore} />
+    <g transform={`translate(${cx} ${cy}) scale(${k}) translate(-32 -14.75)`} filter="url(#torchGlow)">
+      {/* face + brim shadow + eyes */}
+      <ellipse cx="32" cy="19.5" rx="5.6" ry="5.2" fill={skin} />
+      <path d="M32 15 Q37 16 37.5 20 Q37 24 32 24.5 Z" fill="#a67c4d" opacity="0.5" />
+      <circle cx="29.8" cy="20.2" r="1.4" fill="#2a1d10" />
+      <circle cx="34.2" cy="20.2" r="1.4" fill="#2a1d10" />
+      {/* wide pith-helmet brim */}
+      <ellipse cx="32" cy="16.5" rx="12.5" ry="4" fill={helm} />
+      <path d="M20 16.5 Q32 20 44 16.5" fill="none" stroke={helmSh} strokeWidth="1.4" strokeLinecap="round" opacity="0.8" />
+      {/* dome + knob + highlight */}
+      <path d="M23 16 Q23 7 32 7 Q41 7 41 16 Z" fill={helm} />
+      <circle cx="32" cy="6.5" r="2" fill={helm} />
+      <path d="M25 12 Q28 8.6 32 8.3" fill="none" stroke={helmLt} strokeWidth="1.6" strokeLinecap="round" opacity="0.85" />
     </g>
   );
 }
@@ -181,7 +198,7 @@ export function PyramidSprite({
   const backing = `M ${-(baseW / 2 + pad)} 3 L ${baseW / 2 + pad} 3 L 0 ${capApexY} Z`;
   const mound = `M ${-baseW * 0.72} 4 Q 0 ${-s * 0.34} ${baseW * 0.72} 4 L ${baseW * 0.72} ${s * 0.55} L ${-baseW * 0.72} ${s * 0.55} Z`;
 
-  // Find the single "play" block (the current frontier) for the torch.
+  // Find the single "play" block (the current frontier) to mark with the explorer.
   let torch: { cx: number; topY: number } | undefined;
 
   const blocks: ReactNode[] = [];
@@ -234,7 +251,7 @@ export function PyramidSprite({
         strokeWidth={Math.max(1, s * 0.05)}
         opacity={0.6}
       />
-      {torch && <Torch cx={torch.cx} topY={torch.topY} s={s} />}
+      {torch && <ExplorerHead cx={torch.cx} cy={torch.topY + s * 0.16} s={s} />}
     </g>
   );
 }
