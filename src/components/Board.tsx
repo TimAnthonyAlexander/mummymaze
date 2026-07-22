@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, memo } from 'react';
 import { type Dir, type Level, type Pos, monsterStep, samePos } from '../engine';
 import { isLit } from '../game/flashlight';
 import type { RenderState } from '../game/render';
@@ -161,6 +161,114 @@ function gateSeg(g: { a: Pos; dir: Dir }): WallSeg {
   }
 }
 
+/**
+ * Static floor grid: the textured checker cells plus any trap/key decals. Depends
+ * only on the level + cell size, so it is memoized and does NOT re-render while a
+ * turn animates (only the sprites move) — the single biggest render-cost saving.
+ */
+const BoardFloor = memo(function BoardFloor({
+  level,
+  markerSize,
+}: {
+  level: Level;
+  cell: number;
+  markerSize: number;
+}) {
+  return (
+    <div className="board__grid">
+      {level.cells.map((row, y) =>
+        row.map((cellData, x) => {
+          const checker = (x + y) % 2 === 0 ? 'cell--a' : 'cell--b';
+          return (
+            <div key={`${x},${y}`} className={`cell ${checker}`}>
+              {cellData.trap && <TrapDecal className="cell__marker" size={markerSize} />}
+              {cellData.key && <KeyDecal className="cell__marker" size={markerSize} />}
+            </div>
+          );
+        }),
+      )}
+    </div>
+  );
+});
+
+/** Static overlay: baked AO vignette, grain film, and the exit opening. */
+const BoardStaticOverlay = memo(function BoardStaticOverlay({
+  level,
+  cell,
+}: {
+  level: Level;
+  cell: number;
+}) {
+  const w = cell * level.width;
+  const h = cell * level.height;
+  return (
+    <>
+      <div className="board__ao" style={{ width: w, height: h }} aria-hidden="true" />
+      <div className="board__grain" style={{ width: w, height: h }} aria-hidden="true" />
+      <ExitOpening pos={level.exit.pos} dir={level.exit.dir} cell={cell} />
+    </>
+  );
+});
+
+/**
+ * Extruded walls + gates, drawn in two planes (shadow under, top over). Depends
+ * on the level, cell, and which gates are open — so it re-renders only on a gate
+ * toggle, never on every sprite hop.
+ */
+const BoardWalls = memo(function BoardWalls({
+  level,
+  cell,
+  gatesOpen,
+}: {
+  level: Level;
+  cell: number;
+  gatesOpen: RenderState['gatesOpen'];
+}) {
+  const walls = computeWallSegments(level);
+  const hSet = new Set<string>();
+  const vSet = new Set<string>();
+  for (const s of walls) (s.orient === 'h' ? hSet : vSet).add(segKey(s.x, s.y));
+
+  return (
+    <>
+      {walls.map((seg) => (
+        <div
+          key={`sh-${seg.orient}-${seg.x}-${seg.y}`}
+          className="wall-shadow"
+          style={wallStyle(seg, cell, hSet, vSet)}
+        />
+      ))}
+      {level.gates.map((g) =>
+        gatesOpen[g.id] ? null : (
+          <div
+            key={`gsh-${g.id}`}
+            className="wall-shadow"
+            style={wallStyle(gateSeg(g), cell, hSet, vSet)}
+          />
+        ),
+      )}
+      {walls.map((seg) => (
+        <div
+          key={`tp-${seg.orient}-${seg.x}-${seg.y}`}
+          className="wall-top"
+          style={wallStyle(seg, cell, hSet, vSet)}
+        />
+      ))}
+      {level.gates.map((g) => {
+        const seg = gateSeg(g);
+        const open = gatesOpen[g.id];
+        return (
+          <div
+            key={`gtp-${g.id}`}
+            className={`wall-top gate-top gate-top--${seg.orient} ${open ? 'gate-top--open' : ''}`}
+            style={wallStyle(seg, cell, hSet, vSet)}
+          />
+        );
+      })}
+    </>
+  );
+});
+
 interface BoardProps {
   level: Level;
   render: RenderState;
@@ -185,7 +293,6 @@ export function Board({ level, render, cellSize }: BoardProps) {
 
   const markerSize = Math.round(cell * 0.66);
   const charSize = Math.round(cell * 0.82);
-  const walls = computeWallSegments(level);
 
   // Dark levels (SPEC §2.7): a torchlight overlay that follows the explorer.
   // View-only — the engine never sees this. Light is centred on the explorer's
@@ -201,11 +308,6 @@ export function Board({ level, render, cellSize }: BoardProps) {
         height: cell * level.height,
       } as CSSProperties)
     : undefined;
-  // Lookup of every drawn wall segment, so wallStyle can close corner gaps.
-  const hSet = new Set<string>();
-  const vSet = new Set<string>();
-  for (const s of walls) (s.orient === 'h' ? hSet : vSet).add(segKey(s.x, s.y));
-
   // For the planning arrows: if `from` holds a living MUMMY and `to` is exactly a
   // double-step (Manhattan distance 2) away that the mummy can actually reach in
   // its 2 steps, return the routed path (start -> intermediate -> to) using the
@@ -224,82 +326,15 @@ export function Board({ level, render, cellSize }: BoardProps) {
 
   return (
     <div className="board" style={boardStyle}>
-      <div className="board__grid">
-        {level.cells.map((row, y) =>
-          row.map((cellData, x) => {
-            const checker = (x + y) % 2 === 0 ? 'cell--a' : 'cell--b';
-            return (
-              <div key={`${x},${y}`} className={`cell ${checker}`}>
-                {cellData.trap && <TrapDecal className="cell__marker" size={markerSize} />}
-                {cellData.key && <KeyDecal className="cell__marker" size={markerSize} />}
-              </div>
-            );
-          }),
-        )}
-      </div>
+      {/* Static floor grid — memoized, so it never re-renders while a turn plays. */}
+      <BoardFloor level={level} cell={cell} markerSize={markerSize} />
 
       <div className="board__overlay">
-        {/* Baked ambient occlusion vignette over the floor (below the walls). */}
-        <div
-          className="board__ao"
-          style={{ width: cell * level.width, height: cell * level.height }}
-          aria-hidden="true"
-        />
-
-        {/* Extruded boundary walls — raised slabs lit from the top-left. Drawn
-            in two planes so connected walls merge into one solid: every slab's
-            down-right shadow sits on the lower plane, and every slab's flat top
-            face sits above it, covering any shadow that lands on an adjoining
-            slab. The extrusion then only survives where a wall meets floor. */}
-        {walls.map((seg) => (
-          <div
-            key={`sh-${seg.orient}-${seg.x}-${seg.y}`}
-            className="wall-shadow"
-            style={wallStyle(seg, cell, hSet, vSet)}
-          />
-        ))}
-        {/* Closed-gate shadows share the wall shadow plane so tops cover them. */}
-        {level.gates.map((g) =>
-          render.gatesOpen[g.id] ? null : (
-            <div
-              key={`gsh-${g.id}`}
-              className="wall-shadow"
-              style={wallStyle(gateSeg(g), cell, hSet, vSet)}
-            />
-          ),
-        )}
-        {walls.map((seg) => (
-          <div
-            key={`tp-${seg.orient}-${seg.x}-${seg.y}`}
-            className="wall-top"
-            style={wallStyle(seg, cell, hSet, vSet)}
-          />
-        ))}
-        {/* Gate top faces sit on the wall top plane so wall/gate merge cleanly,
-            but render as a barred portcullis (bars across the run) so a gate is
-            structurally distinct from a solid wall. */}
-        {level.gates.map((g) => {
-          const seg = gateSeg(g);
-          const open = render.gatesOpen[g.id];
-          return (
-            <div
-              key={`gtp-${g.id}`}
-              className={`wall-top gate-top gate-top--${seg.orient} ${open ? 'gate-top--open' : ''}`}
-              style={wallStyle(seg, cell, hSet, vSet)}
-            />
-          );
-        })}
-
-        {/* Unifying grain film over floor + stone (below sprites), so everything
-            shares one layer of early-2000s compression fuzz. */}
-        <div
-          className="board__grain"
-          style={{ width: cell * level.width, height: cell * level.height }}
-          aria-hidden="true"
-        />
-
-        {/* Real opening in the border wall the explorer walks out through. */}
-        <ExitOpening pos={level.exit.pos} dir={level.exit.dir} cell={cell} />
+        {/* Static overlay (AO vignette, grain film, exit) + walls/gates. Both are
+            memoized: the only per-hop work left in the overlay is the sprites,
+            the dark torchlight, and the annotations. */}
+        <BoardStaticOverlay level={level} cell={cell} />
+        <BoardWalls level={level} cell={cell} gatesOpen={render.gatesOpen} />
 
         {/* Dark levels: black torchlight overlay above walls/exit, below sprites,
             with a soft circular hole tracking the explorer. Plus a faint exit

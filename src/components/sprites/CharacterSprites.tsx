@@ -11,13 +11,15 @@
  * (duplicate ids in one document collide to the first match).
  */
 
+import { memo } from 'react';
+
 interface SpriteProps {
   size?: number;
   className?: string;
 }
 
 /** Explorer — pulp adventurer: pith helmet, muddy khaki, olive strap. */
-export function ExplorerSprite({ size = 48, className }: SpriteProps) {
+export const ExplorerSprite = memo(function ExplorerSprite({ size = 48, className }: SpriteProps) {
   // An upstanding, broad-shouldered man built from the same cylinder limbs as the
   // mummy, so the cast reads as one set. Pith helmet, khaki, olive sash, boots.
   const khaki = '#b89a5f';
@@ -100,7 +102,7 @@ export function ExplorerSprite({ size = 48, className }: SpriteProps) {
       <path d="M25 12 Q28 8.6 32 8.3" fill="none" stroke={helmLt} strokeWidth="1.6" strokeLinecap="round" opacity="0.85" />
     </svg>
   );
-}
+});
 
 /** Wrapped mummy — the fast pursuer. variant 'white' or 'red'. */
 export function MummySprite({
@@ -264,7 +266,7 @@ export function ScorpionSprite({
 }
 
 /** Convenience: pick the right sprite for a monster kind. */
-export function MonsterSprite({
+export const MonsterSprite = memo(function MonsterSprite({
   kind,
   size,
   className,
@@ -279,4 +281,4 @@ export function MonsterSprite({
   ) : (
     <MummySprite size={size} variant={variant} className={className} />
   );
-}
+});

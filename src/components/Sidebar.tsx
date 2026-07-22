@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Box, Button, Divider, Paper, Stack } from '@mui/material';
 import { Map as MapIcon } from 'lucide-react';
 import type { Action, GameState } from '../engine';
@@ -40,7 +41,7 @@ interface SidebarProps {
  * a very short viewport), and the controls + settings + map + footer are pinned
  * at the bottom so everything fits at normal heights.
  */
-export function Sidebar({
+export const Sidebar = memo(function Sidebar({
   pyramid,
   pyramidProgress,
   currentId,
@@ -137,4 +138,4 @@ export function Sidebar({
       </Box>
     </Paper>
   );
-}
+});
