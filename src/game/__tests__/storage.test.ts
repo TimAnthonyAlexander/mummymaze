@@ -54,7 +54,6 @@ describe('storage', () => {
   it('round-trips save and load', () => {
     const data: SaveData = {
       version: 1,
-      unlockedLevelIds: ['01-first-steps', '02-slow-pursuit'],
       bestMoves: { '01-first-steps': 7 },
       completedLevelIds: ['01-first-steps'],
       lastPlayedLevelId: '02-slow-pursuit',
@@ -72,7 +71,7 @@ describe('storage', () => {
   it('resets on version mismatch', () => {
     globalThis.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ version: 99, unlockedLevelIds: ['x'] }),
+      JSON.stringify({ version: 99, completedLevelIds: ['x'] }),
     );
     expect(loadSave()).toEqual(defaultSave());
   });
@@ -82,16 +81,14 @@ describe('storage', () => {
       STORAGE_KEY,
       JSON.stringify({
         version: 1,
-        unlockedLevelIds: ['a', 42, null], // non-strings dropped
         bestMoves: { good: 3, bad: 'nope', nan: Number.NaN },
-        completedLevelIds: 'not-an-array',
+        completedLevelIds: ['a', 42, null], // non-strings dropped
         settings: { sound: 'yes', animations: false },
       }),
     );
     const loaded = loadSave();
-    expect(loaded.unlockedLevelIds).toEqual(['a']);
+    expect(loaded.completedLevelIds).toEqual(['a']);
     expect(loaded.bestMoves).toEqual({ good: 3 });
-    expect(loaded.completedLevelIds).toEqual([]);
     expect(loaded.settings).toEqual({ sound: true, animations: false, moveArrows: false });
   });
 

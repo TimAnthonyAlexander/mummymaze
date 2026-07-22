@@ -18,9 +18,14 @@ export interface Settings {
 
 export interface SaveData {
   version: 1;
-  unlockedLevelIds: string[];
-  bestMoves: Record<string, number>;
+  /**
+   * Which levels have been cleared. This is the SINGLE source of truth for
+   * progression — "unlocked" and the current frontier are DERIVED from this set
+   * plus the pyramid order (see useProgress), never stored, so reordering the
+   * pyramids can never desync a stale unlock set.
+   */
   completedLevelIds: string[];
+  bestMoves: Record<string, number>;
   lastPlayedLevelId?: string;
   settings: Settings;
 }
@@ -29,7 +34,6 @@ export interface SaveData {
 export function defaultSave(): SaveData {
   return {
     version: 1,
-    unlockedLevelIds: [],
     bestMoves: {},
     completedLevelIds: [],
     settings: { sound: true, animations: true, moveArrows: false },
@@ -91,7 +95,6 @@ function parseSave(raw: unknown): SaveData {
   const base = defaultSave();
   return {
     version: 1,
-    unlockedLevelIds: toStringArray(raw.unlockedLevelIds),
     bestMoves: toNumberRecord(raw.bestMoves),
     completedLevelIds: toStringArray(raw.completedLevelIds),
     lastPlayedLevelId:

@@ -217,7 +217,9 @@ export function PyramidSprite({
   rows.forEach((row, r) => {
     row.forEach((id, i) => {
       const rect = blockRect(r, i, row.length, s, g);
-      const state = pyramidLocked ? 'locked' : stateOf(id);
+      // Per-block state — NOT forced to 'locked' for the whole pyramid, so a
+      // pyramid you've partly cleared keeps its completed levels replayable.
+      const state = stateOf(id);
       if ((state === 'available' || state === 'current') && !torch) {
         torch = { cx: rect.x + rect.w / 2, topY: rect.y };
       }

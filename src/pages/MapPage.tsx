@@ -2,7 +2,7 @@ import { type CSSProperties, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
 import { ArrowLeft } from 'lucide-react';
-import { PYRAMIDS, getPyramidOfLevel, type Pyramid } from '../levels/pyramids';
+import { PYRAMIDS, getPyramidOfLevel } from '../levels/pyramids';
 import { useProgress } from '../game/useProgress';
 import { loadSave } from '../game/storage';
 import { boardTextures } from '../game/textures';
@@ -14,25 +14,23 @@ const STONE_VARS = {
   '--tablet-stone': boardTextures.wallTop,
 } as CSSProperties;
 
-/** Resolve the pyramid the player is currently in (last-played, else the first). */
-function currentPyramid(): Pyramid {
-  const lastId = loadSave().lastPlayedLevelId;
-  return (lastId && getPyramidOfLevel(lastId)) || PYRAMIDS[0];
-}
-
 /** Full-viewport world map. Reachable at `/map`. */
 export function MapPage() {
   const navigate = useNavigate();
-  const { unlocked, completed, pyramidProgress } = useProgress();
+  const { unlocked, completed, currentLevelId, pyramidProgress } = useProgress();
 
-  const active = currentPyramid();
+  // The map's single marker is the derived frontier (the current objective), and
+  // the view centres on its pyramid — not on whatever was last opened.
+  const currentId = currentLevelId;
+  const active = (currentId && getPyramidOfLevel(currentId)) || PYRAMIDS[0];
   const activeIndex = Math.max(0, PYRAMIDS.findIndex((p) => p.id === active.id));
-  const lastId = loadSave().lastPlayedLevelId;
-  const currentId = lastId && LEVELS.some((l) => l.id === lastId) ? lastId : undefined;
 
   const onSelect = useCallback((id: string) => navigate(`/play/${id}`), [navigate]);
 
-  const backTo = currentId ?? LEVELS[0].id;
+  // "Back to game" resumes where you were, falling back to the current objective.
+  const lastId = loadSave().lastPlayedLevelId;
+  const backTo =
+    (lastId && LEVELS.some((l) => l.id === lastId) && lastId) || currentId || LEVELS[0].id;
 
   return (
     <Box style={STONE_VARS} sx={{ position: 'fixed', inset: 0, overflow: 'hidden', bgcolor: '#14100a' }}>

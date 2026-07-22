@@ -33,9 +33,10 @@ export function SidebarPyramid({
   const numberOf = (id: string) => flatBaseToApex.indexOf(id) + 1;
 
   const stateOf = (id: string): BlockState => {
-    if (!unlocked.has(id)) return 'locked';
-    if (id === currentId) return 'current';
+    // Completed wins outright, so a completed level is never mislabelled current.
     if (completed.has(id)) return 'completed';
+    if (id === currentId) return 'current';
+    if (!unlocked.has(id)) return 'locked';
     return 'available';
   };
   const labelOf = (id: string) => `${numberOf(id)}. ${displayName(id)}`;

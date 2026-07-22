@@ -122,9 +122,10 @@ export function WorldTrail({
   useEffect(() => () => setGrabbing(false), []);
 
   const stateOf = (levelId: string): BlockState => {
-    if (!unlocked.has(levelId)) return 'locked';
-    if (levelId === currentId) return 'current';
+    // Completed wins outright, so a completed level is never mislabelled current.
     if (completed.has(levelId)) return 'completed';
+    if (levelId === currentId) return 'current';
+    if (!unlocked.has(levelId)) return 'locked';
     return 'available';
   };
 
