@@ -10,7 +10,7 @@ import {
   Squircle,
   Undo2,
 } from 'lucide-react';
-import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@mui/material';
+import { Box, IconButton, Stack, Tooltip, Typography } from '@mui/material';
 import type { Action } from '../engine';
 
 interface ControlsProps {
@@ -256,62 +256,58 @@ export function Controls({
           )}
         </Stack>
       ) : (
-        <>
-          <Stack direction="row" sx={{ gap: 1 }}>
-            <Button
-              onClick={onUndo}
-              disabled={!canUndo}
-              startIcon={<Undo2 size={18} />}
-              variant="outlined"
-              color="secondary"
-              size="small"
-            >
-              Undo
-            </Button>
-            <Button
-              onClick={onRestart}
-              startIcon={<RotateCcw size={18} />}
-              variant="outlined"
-              color="warning"
-              size="small"
-            >
-              Restart
-            </Button>
+        /* Desktop: carved-stone control keys. */
+        <Stack sx={{ gap: 1, width: '100%' }}>
+          <Stack direction="row" sx={{ gap: 1, width: '100%' }}>
+            <Tooltip title="Undo (U)" disableInteractive>
+              <Box sx={{ flex: 1 }}>
+                <button type="button" className="stone-btn stone-btn--sm" onClick={onUndo} disabled={!canUndo}>
+                  <Undo2 size={16} />
+                  Undo
+                </button>
+              </Box>
+            </Tooltip>
+            <Tooltip title="Restart (R)" disableInteractive>
+              <Box sx={{ flex: 1 }}>
+                <button type="button" className="stone-btn stone-btn--sm stone-btn--warn" onClick={onRestart}>
+                  <RotateCcw size={16} />
+                  Restart
+                </button>
+              </Box>
+            </Tooltip>
           </Stack>
 
           {showHintButtons && (
-            <Stack direction="row" sx={{ gap: 1 }}>
+            <Stack direction="row" sx={{ gap: 1, width: '100%' }}>
               <Tooltip title={hintUsed ? 'Hint already used this level' : 'Reveal the next best move'}>
-                <span>
-                  <Button
+                <Box sx={{ flex: 1 }}>
+                  <button
+                    type="button"
+                    className="stone-btn stone-btn--sm stone-btn--gold"
                     onClick={onHint}
                     disabled={disabled || hintUsed || !onHint}
-                    startIcon={<Lightbulb size={18} />}
-                    variant="outlined"
-                    size="small"
                   >
+                    <Lightbulb size={16} />
                     Hint
-                  </Button>
-                </span>
+                  </button>
+                </Box>
               </Tooltip>
               <Tooltip title="Last resort: reveal the full remaining solution">
-                <span>
-                  <Button
+                <Box sx={{ flex: 1 }}>
+                  <button
+                    type="button"
+                    className="stone-btn stone-btn--sm stone-btn--muted"
                     onClick={onShowSolution}
                     disabled={disabled || !onShowSolution}
-                    startIcon={<Eye size={18} />}
-                    variant="text"
-                    size="small"
-                    color="inherit"
-                    sx={{ color: 'text.secondary' }}
                   >
-                    Show solution
-                  </Button>
-                </span>
+                    <Eye size={16} />
+                    Solution
+                  </button>
+                </Box>
               </Tooltip>
             </Stack>
           )}
-        </>
+        </Stack>
       )}
 
       {showHintButtons && (

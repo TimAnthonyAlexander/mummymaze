@@ -12,7 +12,6 @@ import { StatusPanel } from './StatusPanel';
 import { SettingsToggles } from './SettingsToggles';
 import { SidebarPyramid } from './SidebarPyramid';
 import { Ankh } from './Ankh';
-import './Sidebar.css';
 
 interface SidebarProps {
   pyramid: Pyramid;
@@ -90,6 +89,11 @@ export const Sidebar = memo(function Sidebar({
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
+        // Set on the instance (not a class) so it beats the MuiPaper theme
+        // override deterministically; the dark overlay keeps the stone deep.
+        backgroundColor: '#140d06',
+        backgroundImage: `linear-gradient(rgba(8,5,2,0.52), rgba(8,5,2,0.6)), var(--frame-stone)`,
+        backgroundSize: 'auto, 172px',
       }}
     >
       {/* Pinned: title */}

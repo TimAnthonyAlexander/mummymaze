@@ -49,3 +49,167 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Carved-stone UI primitives (early-2000s tomb look) ─────────────────────
+   Global so they're available in every shell (desktop rail + mobile bar), and
+   so they never lose a specificity race with MUI's runtime-injected styles. */
+
+.sidebar {
+  border-right: 2px solid #100b04 !important;
+  box-shadow: inset -3px 0 7px rgba(0, 0, 0, 0.55);
+}
+
+/* A chunky sandstone key: raised bevel + hard bottom edge that presses in on
+   click. --tablet-stone (a light sandstone texture) is set on the .sidebar root. */
+.stone-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  padding: 13px 14px;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.4px;
+  color: #fbf0d2;
+  background-color: #7c5a2c;
+  background-image: var(--tablet-stone);
+  background-size: 128px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
+  box-shadow:
+    inset 2px 2px 0 rgba(248, 234, 194, 0.34),
+    inset -2px -3px 0 rgba(0, 0, 0, 0.46),
+    inset 0 0 0 1px rgba(18, 11, 4, 0.65),
+    0 3px 0 rgba(0, 0, 0, 0.5),
+    0 6px 11px rgba(0, 0, 0, 0.45);
+  transition:
+    transform 90ms ease,
+    filter 120ms ease,
+    box-shadow 90ms ease;
+}
+.stone-btn:hover:not(:disabled) {
+  filter: brightness(1.09);
+}
+.stone-btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow:
+    inset 2px 2px 0 rgba(248, 234, 194, 0.22),
+    inset -1px -2px 0 rgba(0, 0, 0, 0.44),
+    inset 0 0 0 1px rgba(18, 11, 4, 0.65),
+    0 1px 0 rgba(0, 0, 0, 0.44);
+}
+.stone-btn:focus-visible {
+  outline: 2px solid #f4d778;
+  outline-offset: 2px;
+}
+.stone-btn svg {
+  color: #ffd873;
+  flex-shrink: 0;
+}
+.stone-btn:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+/* Small variant for the in-game control keys (Undo / Restart / Hint / Solution). */
+.stone-btn--sm {
+  padding: 8px 8px;
+  font-size: 13px;
+  gap: 6px;
+  border-radius: 7px;
+  box-shadow:
+    inset 2px 2px 0 rgba(248, 234, 194, 0.3),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.44),
+    inset 0 0 0 1px rgba(18, 11, 4, 0.65),
+    0 2px 0 rgba(0, 0, 0, 0.5),
+    0 4px 8px rgba(0, 0, 0, 0.4);
+}
+.stone-btn--sm:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    inset 2px 2px 0 rgba(248, 234, 194, 0.2),
+    inset 0 0 0 1px rgba(18, 11, 4, 0.65),
+    0 1px 0 rgba(0, 0, 0, 0.44);
+}
+.stone-btn--warn,
+.stone-btn--warn svg {
+  color: #f4b878;
+}
+.stone-btn--gold,
+.stone-btn--gold svg {
+  color: #ffe08a;
+}
+.stone-btn--muted {
+  color: #e6d6ac;
+}
+.stone-btn--muted svg {
+  color: #d8c495;
+}
+
+/* A recessed dark-stone niche with a faint gold engraved rim (pyramid plaque). */
+.stone-plaque {
+  position: relative;
+  border-radius: 10px;
+  padding: 8px 12px 10px;
+  background-color: #1c1408;
+  background-image: var(--frame-stone);
+  background-size: 150px;
+  border: 1px solid #5a4420;
+  box-shadow:
+    inset 3px 3px 9px rgba(0, 0, 0, 0.65),
+    inset -1px -1px 0 rgba(214, 190, 138, 0.1),
+    inset 0 0 0 1px rgba(120, 90, 30, 0.3);
+}
+.stone-plaque__ankh {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  z-index: 2;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.75));
+}
+
+/* A carved divider: dark groove with a thin lit lip below. */
+.stone-rule {
+  height: 0;
+  margin: 2px 0;
+  border: 0;
+  border-top: 1px solid rgba(8, 5, 2, 0.75);
+  border-bottom: 1px solid rgba(214, 190, 138, 0.08);
+}
+
+/* An engraved stone tag — the moves / par / outcome readouts, sunk into stone. */
+.stone-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 4px;
+  border-radius: 5px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 0.3px;
+  color: #f0d89a;
+  background: #201708;
+  box-shadow:
+    inset 1px 1px 2px rgba(0, 0, 0, 0.65),
+    inset -1px -1px 0 rgba(240, 220, 170, 0.1),
+    inset 0 0 0 1px rgba(120, 90, 30, 0.42);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+.stone-tag svg {
+  color: #d9b24a;
+  flex-shrink: 0;
+}
+.stone-tag--success,
+.stone-tag--success svg {
+  color: #93dcac;
+}
+.stone-tag--error,
+.stone-tag--error svg {
+  color: #e79b86;
+}
