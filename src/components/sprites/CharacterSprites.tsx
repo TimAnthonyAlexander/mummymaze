@@ -63,24 +63,27 @@ export function ExplorerSprite({ size = 48, className }: SpriteProps) {
       <path d="M23 24 L40 44" stroke="#48633a" strokeWidth="1.3" strokeLinecap="round" opacity="0.7" />
       <rect x="15.5" y="40" width="8.5" height="8.5" rx="2.2" fill="#6b4a24" stroke="#4a3216" strokeWidth="1" />
 
-      {/* ── arms (cylinders) at the sides, foreshortened SHORT toward us ── */}
-      {/* shadow the arms cast onto the torso for separation */}
-      <ellipse cx="22.5" cy="41" rx="4" ry="2.3" fill="#241505" opacity="0.32" />
-      <ellipse cx="41.5" cy="41" rx="4" ry="2.3" fill="#241505" opacity="0.36" />
-      <line x1="21.5" y1="25" x2="21.5" y2="39" stroke={khaki} strokeWidth="6.2" strokeLinecap="round" />
-      <line x1="42.5" y1="25" x2="42.5" y2="39" stroke={khakiSh} strokeWidth="6.2" strokeLinecap="round" />
-      {/* lit OUTER edge + dark INNER seam so the arms read in front of the torso */}
-      <line x1="20.1" y1="26" x2="20.1" y2="38" stroke={khakiLt} strokeWidth="2.6" strokeLinecap="round" />
-      <line x1="41.4" y1="26" x2="41.4" y2="38" stroke={khaki} strokeWidth="2.2" strokeLinecap="round" opacity="0.9" />
-      <line x1="24.3" y1="26" x2="24.3" y2="38" stroke="#241505" strokeWidth="2" strokeLinecap="round" opacity="0.42" />
-      <line x1="39.7" y1="26" x2="39.7" y2="38" stroke="#241505" strokeWidth="2.2" strokeLinecap="round" opacity="0.46" />
-      {/* fists at the near ends */}
-      <ellipse cx="21.5" cy="39.5" rx="3.6" ry="3" fill={khaki} />
-      <ellipse cx="42.5" cy="39.5" rx="3.6" ry="3" fill={khakiSh} />
-      {/* flashlight held in the right hand, aimed down-forward */}
-      <g transform="translate(43 41) rotate(38)">
-        <rect x="-1.5" y="-2.6" width="8" height="5.2" rx="2" fill="#b08f30" stroke="#7a5f1c" strokeWidth="1" />
-        <path d="M6.5 -3.2 L10.5 -4 L10.5 4 L6.5 3.2 Z" fill="#8f7124" stroke="#5f4a15" strokeWidth="1" strokeLinejoin="round" />
+      {/* ── arms BENT at the elbow, forearms coming forward; the right hand
+            carries the flashlight out in front ── */}
+      {/* shadows the forearms cast onto the torso (separation) */}
+      <ellipse cx="25.5" cy="43" rx="4" ry="2" fill="#241505" opacity="0.3" />
+      <ellipse cx="38.5" cy="43" rx="4" ry="2" fill="#241505" opacity="0.34" />
+      {/* left arm: upper arm straight DOWN the side, forearm bends forward-in */}
+      <path d="M21 24 Q20.6 29 20.9 33 Q21.8 38 25 40.2" fill="none" stroke={khaki} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M20.1 25 Q19.8 29 20.1 32.5" fill="none" stroke={khakiLt} strokeWidth="2.2" strokeLinecap="round" />
+      {/* right arm: upper arm straight DOWN, forearm brings the flashlight forward */}
+      <path d="M43 24 Q43.4 29 43.1 33 Q42.2 38 39 40.2" fill="none" stroke={khakiSh} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M43.2 25 Q43.5 29 43.2 32.5" fill="none" stroke={khaki} strokeWidth="2" strokeLinecap="round" opacity="0.85" />
+      {/* dark seams where the upper arms meet the torso */}
+      <line x1="23.7" y1="26" x2="23.7" y2="32" stroke="#241505" strokeWidth="1.8" strokeLinecap="round" opacity="0.42" />
+      <line x1="40.3" y1="26" x2="40.3" y2="32" stroke="#241505" strokeWidth="2" strokeLinecap="round" opacity="0.46" />
+      {/* hands */}
+      <ellipse cx="25.2" cy="41" rx="3.3" ry="2.9" fill={khaki} />
+      <ellipse cx="39" cy="41" rx="3.3" ry="2.9" fill={khakiSh} />
+      {/* flashlight gripped in the right hand, aimed down-forward */}
+      <g transform="translate(39.5 41.5) rotate(52)">
+        <rect x="-1.5" y="-2.5" width="8" height="5" rx="2" fill="#b08f30" stroke="#7a5f1c" strokeWidth="1" />
+        <path d="M6.5 -3 L10.5 -3.8 L10.5 3.8 L6.5 3 Z" fill="#8f7124" stroke="#5f4a15" strokeWidth="1" strokeLinejoin="round" />
       </g>
 
       {/* ── head: shadowed face under a wide pith helmet ── */}
