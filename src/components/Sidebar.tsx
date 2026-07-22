@@ -139,7 +139,7 @@ export const Sidebar = memo(function Sidebar({
           </RouterLink>
 
           <Box className="stone-plaque" sx={{ mt: 0.5 }}>
-            <Ankh size={34} className="stone-plaque__ankh" />
+            <Ankh size={34} className="stone-plaque__ankh" dead={unsolvable} />
             <Stack
               direction="row"
               sx={{ alignItems: 'baseline', justifyContent: 'space-between', gap: 1, mb: 0.5, pr: 3.5 }}

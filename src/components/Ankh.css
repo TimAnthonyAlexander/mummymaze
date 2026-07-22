@@ -1,0 +1,24 @@
+/* Ankh — attention pulse for the "dead maze" (unsolvable) state. A gentle,
+ * tasteful breathing of the blood-red amulet; never a flash. Disabled entirely
+ * under reduced-motion. */
+.ankh--dead {
+  animation: ankh-dead-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ankh-dead-pulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    filter: drop-shadow(0 0 1px rgba(140, 20, 12, 0.35));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 4px rgba(180, 30, 20, 0.6));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ankh--dead {
+    animation: none;
+  }
+}
