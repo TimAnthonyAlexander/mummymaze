@@ -125,6 +125,7 @@ export function MobileShell({
 
       <Box sx={{ py: 1.5, flexShrink: 0 }}>
         <Controls
+          compact
           onMove={onMove}
           onUndo={onUndo}
           onRestart={onRestart}
