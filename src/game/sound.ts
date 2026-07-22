@@ -54,7 +54,12 @@ function audio(): Ctx | null {
       }
       ctx = new Ctor();
     }
-    if (ctx.state === 'suspended') void ctx.resume();
+    // Resume on ANY non-running state, not just 'suspended'. Safari/iOS park the
+    // context in 'interrupted' whenever OUR tab is backgrounded/occluded (or after
+    // a screen lock / long idle); Chrome uses 'suspended'. resume() is a no-op when
+    // running and may reject on an 'interrupted' context — swallow it; the gesture
+    // + visibility handlers below are what actually recover it.
+    if (ctx.state !== 'running') void ctx.resume().catch(() => {});
     return ctx;
   } catch {
     ctxFailed = true;
@@ -73,7 +78,7 @@ function unlock(): void {
   const c = audio();
   if (!c) return;
   try {
-    if (c.state === 'suspended') void c.resume();
+    if (c.state !== 'running') void c.resume().catch(() => {});
     const src = c.createBufferSource();
     src.buffer = c.createBuffer(1, 1, c.sampleRate);
     src.connect(c.destination);
@@ -86,20 +91,40 @@ function unlock(): void {
 }
 
 let unlockInstalled = false;
-/** Install one-time gesture listeners that unlock audio on the first interaction. */
+/**
+ * Install gesture + visibility listeners that keep audio recoverable for the
+ * whole page lifetime.
+ *
+ * The gesture listeners are kept attached FOREVER — never detached after the
+ * first unlock. Safari/iOS suspend or 'interrupt' a tab's AudioContext whenever
+ * that tab is backgrounded, minimized, or occluded, or when another tab steals
+ * the single output session; the ONLY reliable cure once wedged is `resume()`
+ * from a real user gesture (a gestureless resume rejects on an interrupted
+ * context). Detaching the listeners after the first unlock — as this used to —
+ * is exactly what left sound permanently silent after switching tabs and back,
+ * until a full browser restart. So the next click/keypress must always be able
+ * to recover audio, which means we must still be listening.
+ */
 function installUnlock(): void {
   if (unlockInstalled) return;
   if (typeof window === 'undefined' || typeof document === 'undefined') return;
   unlockInstalled = true;
   const events: (keyof WindowEventMap)[] = ['pointerdown', 'keydown', 'touchend'];
-  const handler = () => {
-    unlock();
-    // Once the context is actually running we no longer need the listeners.
-    if (ctx && ctx.state === 'running') {
-      for (const e of events) window.removeEventListener(e, handler);
+  const prime = () => unlock(); // resumes on every gesture; recovers a wedged ctx
+  for (const e of events) window.addEventListener(e, prime);
+
+  // Tab-switch recovery. On HIDE, proactively suspend our own context so it comes
+  // back with a clean `resume()` — a context we suspend ourselves recovers, but
+  // the 'running-but-silent' wedge Safari imposes when another tab grabs the
+  // output session does not. On SHOW, resume it. If Safari still wedged it, the
+  // next gesture's prime() is the fallback cure.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      if (ctx && ctx.state === 'running') void ctx.suspend().catch(() => {});
+      return;
     }
-  };
-  for (const e of events) window.addEventListener(e, handler);
+    if (ctx && ctx.state !== 'running') void ctx.resume().catch(() => {});
+  });
 }
 
 /** True when sound is on. Reads storage once, then serves the cache. */

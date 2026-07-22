@@ -222,9 +222,17 @@ no engine/mechanics changed. Key pieces:
   error. `tsc` catches it; Vite dev does not.
 - **Safari Web Audio**: Safari won't start/resume an `AudioContext` outside a
   direct user gesture, and our SFX fire from the animation `setTimeout` timeline.
-  `sound.ts` installs one-time gesture listeners that create+resume+kick a silent
-  buffer to unlock. Don't remove that, or Safari goes silent (Chrome is lax and
-  hides the bug).
+  `sound.ts` installs gesture listeners (pointerdown/keydown/touchend) that
+  create+resume+kick a silent buffer + warm every sample. These stay attached
+  **for the whole page lifetime — never detached** (detaching after the first
+  unlock left audio permanently silent after a tab switch, until a browser
+  restart). Safari suspends/`'interrupt'`s a backgrounded tab's context, so:
+  `audio()`/`unlock()` resume on ANY non-`'running'` state (not just
+  `'suspended'`), and a `visibilitychange` handler proactively `suspend()`s on
+  hide (clean recovery) and `resume()`s on show; a wedged context is otherwise
+  cured by the next gesture. Ported from `~/chessgo`'s `sounds.ts`. Don't
+  re-add listener removal or narrow the resume to `'suspended'` (Chrome is lax
+  and hides the bug).
 - **HMR desync**: renaming/removing an exported hook breaks React Fast Refresh and
   leaves the page in a stale, wrong state (once looked like sprites "phasing
   through walls" — it wasn't a real bug). After such a change, hard-refresh or
