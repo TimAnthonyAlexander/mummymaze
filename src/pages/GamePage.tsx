@@ -9,6 +9,7 @@ import { PYRAMIDS, getPyramidOfLevel, nextInProgression } from '../levels/pyrami
 import { useAnimatedGame } from '../game/useAnimatedGame';
 import { useProgress } from '../game/useProgress';
 import { useHints } from '../game/useHints';
+import { useSettings } from '../game/useSettings';
 import { Sidebar } from '../components/Sidebar';
 import { BoardPane } from '../components/BoardPane';
 import { MobileShell } from '../components/MobileShell';
@@ -41,6 +42,7 @@ export function GamePage() {
   const { isUnlocked, recordWin, setLastPlayed } = progress;
 
   const hints = useHints(state);
+  const { moveArrows } = useSettings();
 
   // Reload engine when the route's level changes.
   useEffect(() => {
@@ -197,6 +199,8 @@ export function GamePage() {
         render={render}
         animating={animating}
         hasNext={Boolean(next)}
+        moveArrows={moveArrows}
+        onMove={move}
         onRestart={restart}
         onNext={() => next && navigate(`/play/${next}`)}
       />

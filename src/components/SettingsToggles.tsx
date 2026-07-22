@@ -1,5 +1,5 @@
 import { IconButton, Stack, Tooltip } from '@mui/material';
-import { Volume2, VolumeX, Zap, ZapOff } from 'lucide-react';
+import { MousePointerClick, Move, Volume2, VolumeX, Zap, ZapOff } from 'lucide-react';
 import { useSettings } from '../game/useSettings';
 
 interface SettingsTogglesProps {
@@ -16,7 +16,8 @@ interface SettingsTogglesProps {
  * at a time). Lucide speaker / lightning icons flip with the setting.
  */
 export function SettingsToggles({ iconSize = 20, compact = false }: SettingsTogglesProps) {
-  const { sound, animations, toggleSound, toggleAnimations } = useSettings();
+  const { sound, animations, moveArrows, toggleSound, toggleAnimations, toggleMoveArrows } =
+    useSettings();
 
   return (
     <Stack direction="row" spacing={compact ? 0 : 0.5} sx={{ alignItems: 'center' }}>
@@ -40,6 +41,17 @@ export function SettingsToggles({ iconSize = 20, compact = false }: SettingsTogg
           sx={{ color: animations ? 'text.primary' : 'text.disabled' }}
         >
           {animations ? <Zap size={iconSize} /> : <ZapOff size={iconSize} />}
+        </IconButton>
+      </Tooltip>
+      <Tooltip title={moveArrows ? 'Hide click-to-move arrows' : 'Show click-to-move arrows'}>
+        <IconButton
+          size={compact ? 'small' : 'medium'}
+          aria-label={moveArrows ? 'Hide move arrows' : 'Show move arrows'}
+          aria-pressed={moveArrows}
+          onClick={toggleMoveArrows}
+          sx={{ color: moveArrows ? 'text.primary' : 'text.disabled' }}
+        >
+          {moveArrows ? <MousePointerClick size={iconSize} /> : <Move size={iconSize} />}
         </IconButton>
       </Tooltip>
     </Stack>

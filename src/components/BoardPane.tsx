@@ -1,7 +1,7 @@
 import { type CSSProperties, useLayoutEffect, useRef, useState } from 'react';
 import { Box, Stack, Typography } from '@mui/material';
 import { ArrowRight, RotateCcw } from 'lucide-react';
-import type { GameState } from '../engine';
+import type { Action, GameState } from '../engine';
 import type { RenderState } from '../game/render';
 import { boardTextures } from '../game/textures';
 import { Board } from './Board';
@@ -26,6 +26,8 @@ interface BoardPaneProps {
   render: RenderState;
   animating: boolean;
   hasNext: boolean;
+  moveArrows: boolean;
+  onMove: (action: Action) => void;
   onRestart: () => void;
   onNext: () => void;
 }
@@ -40,6 +42,8 @@ export function BoardPane({
   render,
   animating,
   hasNext,
+  moveArrows,
+  onMove,
   onRestart,
   onNext,
 }: BoardPaneProps) {
@@ -90,7 +94,14 @@ export function BoardPane({
       {cellSize > 0 && (
         <Box sx={{ position: 'relative', overflow: 'visible' }}>
           <BoardFrame thickness={frame}>
-            <Board level={state.level} render={render} cellSize={cellSize} />
+            <Board
+              level={state.level}
+              render={render}
+              cellSize={cellSize}
+              moveArrows={moveArrows}
+              interactive={state.phase === 'player' && !animating}
+              onMove={onMove}
+            />
           </BoardFrame>
           {done && (
             <Box

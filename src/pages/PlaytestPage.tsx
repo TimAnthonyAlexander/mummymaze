@@ -9,6 +9,7 @@ import { Box, Button, Link, Paper, Stack, Typography } from '@mui/material';
 import { ArrowLeft, Home } from 'lucide-react';
 import { loadLevel, type Action, type Level } from '../engine';
 import { useAnimatedGame } from '../game/useAnimatedGame';
+import { useSettings } from '../game/useSettings';
 import { BoardPane } from '../components/BoardPane';
 import { Controls } from '../components/Controls';
 
@@ -58,6 +59,7 @@ export function PlaytestPage() {
 function PlaytestGame({ level }: { level: Level }) {
   const game = useAnimatedGame(level);
   const { state, render, animating, move, undo, restart } = game;
+  const { moveArrows } = useSettings();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -128,6 +130,8 @@ function PlaytestGame({ level }: { level: Level }) {
         render={render}
         animating={animating}
         hasNext={false}
+        moveArrows={moveArrows}
+        onMove={move}
         onRestart={restart}
         onNext={() => undefined}
       />

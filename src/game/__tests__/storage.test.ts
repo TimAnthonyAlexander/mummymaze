@@ -58,7 +58,7 @@ describe('storage', () => {
       bestMoves: { '01-first-steps': 7 },
       completedLevelIds: ['01-first-steps'],
       lastPlayedLevelId: '02-slow-pursuit',
-      settings: { sound: false, animations: true },
+      settings: { sound: false, animations: true, moveArrows: false },
     };
     saveSave(data);
     expect(loadSave()).toEqual(data);
@@ -92,7 +92,7 @@ describe('storage', () => {
     expect(loaded.unlockedLevelIds).toEqual(['a']);
     expect(loaded.bestMoves).toEqual({ good: 3 });
     expect(loaded.completedLevelIds).toEqual([]);
-    expect(loaded.settings).toEqual({ sound: true, animations: false });
+    expect(loaded.settings).toEqual({ sound: true, animations: false, moveArrows: false });
   });
 
   it('does not crash and falls back to memory when setItem throws (quota)', () => {

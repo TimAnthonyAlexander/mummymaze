@@ -11,6 +11,7 @@ import { LevelDrawer } from './LevelDrawer';
 import { AppTitle } from './AppTitle';
 import { StatusChips } from './StatusChips';
 import { SettingsToggles } from './SettingsToggles';
+import { useSettings } from '../game/useSettings';
 
 interface MobileShellProps {
   pyramid: Pyramid;
@@ -69,6 +70,7 @@ export function MobileShell({
   onShowSolution,
 }: MobileShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { moveArrows } = useSettings();
 
   return (
     <Box
@@ -123,6 +125,8 @@ export function MobileShell({
           render={render}
           animating={animating}
           hasNext={hasNext}
+          moveArrows={moveArrows}
+          onMove={onMove}
           onRestart={onRestart}
           onNext={onNext}
         />

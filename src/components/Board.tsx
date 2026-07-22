@@ -1,5 +1,15 @@
 import { type CSSProperties, memo } from 'react';
-import { type Dir, type Level, type Pos, monsterStep, samePos } from '../engine';
+import {
+  type Dir,
+  type Level,
+  type Pos,
+  DIRS,
+  canCross,
+  inBounds,
+  monsterStep,
+  neighbor,
+  samePos,
+} from '../engine';
 import { isLit } from '../game/flashlight';
 import type { RenderState } from '../game/render';
 import { boardTextures } from '../game/textures';
@@ -10,6 +20,20 @@ import './Board.css';
 
 function spriteStyle(pos: Pos, cell: number): CSSProperties {
   return { transform: `translate(${pos.x * cell}px, ${pos.y * cell}px)` };
+}
+
+/**
+ * Like `spriteStyle` but nudges the whole sprite (body + shadow) slightly UP-LEFT
+ * within its own tile, for a pre-rendered "standing in the cell" read. Used for
+ * the player, monsters, and the start marker (which must track the feet) — NOT
+ * for board furniture like the exit opening/beacon, which stay tile-aligned.
+ * The vertical lift reads as depth; the horizontal nudge is small so sprites stay
+ * centred left-to-right in the tile.
+ */
+function charStyle(pos: Pos, cell: number): CSSProperties {
+  const nudgeX = cell * 0.03;
+  const nudgeY = cell * 0.07;
+  return { transform: `translate(${pos.x * cell - nudgeX}px, ${pos.y * cell - nudgeY}px)` };
 }
 
 /** Cardinal direction from `from` toward `to`, by the dominant axis. */
@@ -269,14 +293,113 @@ const BoardWalls = memo(function BoardWalls({
   );
 });
 
+// Move-arrow, authored pointing up (N) as smooth high-res vector. A COMPACT, WIDE,
+// roughly-equilateral arrowhead with a CONCAVE notched back (a stout dart) — not a
+// tall spike, no separate shaft. Saturated arcade green fills ~80% of it. Light is
+// from the upper-left, so a NARROW yellow highlight sits on the lit edge and the
+// notch and FADES into the body (soft, blurred — not a hard stripe); a subtle
+// darker green shades the shadow edge. The outline is a thin dark edge, not a
+// dominant frame. The whole thing rotates per direction (light fixed to the arrow).
+const DART_BODY = 'M12 3 L20 17 L12 11.5 L4 17 Z';
+const DART_LIT = 'M12 3 L4 17 L12 11.5'; // left outer edge + left notch (toward light)
+const DART_SHADE = 'M12 3 L20 17 L12 11.5'; // right outer edge + right notch (shadow)
+const ARROW_DEG: Record<Dir, number> = { N: 0, E: 90, S: 180, W: 270 };
+
+/** A clickable vector dart on each tile the explorer can step to (opt-in aid). */
+const MoveArrows = memo(function MoveArrows({
+  level,
+  player,
+  monsters,
+  gatesOpen,
+  cell,
+  onMove,
+}: {
+  level: Level;
+  player: Pos;
+  monsters: RenderState['monsters'];
+  gatesOpen: RenderState['gatesOpen'];
+  cell: number;
+  onMove: (dir: Dir) => void;
+}) {
+  const size = Math.round(cell * 0.74);
+  return (
+    <>
+      {DIRS.filter((dir) => {
+        const to = neighbor(player, dir);
+        if (!inBounds(level, to) || !canCross(level, gatesOpen, player, dir)) return false;
+        // Skip tiles holding a living monster — stepping there is instant death,
+        // never a move you'd offer as a one-click option.
+        return !monsters.some((m) => m.alive && samePos(m.pos, to));
+      }).map((dir) => {
+        const clip = `dart-clip-${dir}`;
+        const blur = `dart-blur-${dir}`;
+        const to = neighbor(player, dir);
+        return (
+          <button
+            key={dir}
+            type="button"
+            className="move-arrow"
+            aria-label={`Move ${dir}`}
+            style={spriteStyle(to, cell)}
+            onClick={() => onMove(dir)}
+          >
+            <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+              <defs>
+                <clipPath id={clip}>
+                  <path d={DART_BODY} />
+                </clipPath>
+                <filter id={blur} x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="0.7" />
+                </filter>
+              </defs>
+              <g transform={`rotate(${ARROW_DEG[dir]} 12 12)`}>
+                {/* saturated green body — the dominant colour */}
+                <path d={DART_BODY} fill="#33d13b" />
+                {/* soft bevel shading, clipped inside the silhouette and blurred so
+                    it FADES into the body: a subtle shadow, then a NARROW yellow
+                    highlight accent on the lit edge + notch. */}
+                <g clipPath={`url(#${clip})`} filter={`url(#${blur})`}>
+                  <path d={DART_SHADE} fill="none" stroke="#0f8027" strokeWidth="2.8" opacity="0.9" />
+                  <path d={DART_LIT} fill="none" stroke="#ffe863" strokeWidth="2.2" opacity="1" />
+                </g>
+                {/* thin dark edge — subtle, not a frame */}
+                <path
+                  d={DART_BODY}
+                  fill="none"
+                  stroke="#123f18"
+                  strokeWidth="0.9"
+                  strokeLinejoin="miter"
+                />
+              </g>
+            </svg>
+          </button>
+        );
+      })}
+    </>
+  );
+});
+
 interface BoardProps {
   level: Level;
   render: RenderState;
   /** Dynamic cell edge length in px, computed to fill the available pane. */
   cellSize: number;
+  /** Show clickable move arrows on reachable tiles (persisted setting). */
+  moveArrows?: boolean;
+  /** True only when it's the player's turn and no animation is playing. */
+  interactive?: boolean;
+  /** Dispatch a move when an arrow is clicked. */
+  onMove?: (dir: Dir) => void;
 }
 
-export function Board({ level, render, cellSize }: BoardProps) {
+export function Board({
+  level,
+  render,
+  cellSize,
+  moveArrows = false,
+  interactive = false,
+  onMove,
+}: BoardProps) {
   const cell = cellSize;
   // Depth amount scales with the tile so the tilt reads the same at any size.
   const wallLift = Math.max(4, Math.round(cell * 0.12));
@@ -361,7 +484,7 @@ export function Board({ level, render, cellSize }: BoardProps) {
               <div
                 key={m.id}
                 className={`sprite sprite--monster${lit ? '' : ' sprite--eyes'}`}
-                style={spriteStyle(m.pos, cell)}
+                style={charStyle(m.pos, cell)}
               >
                 {lit ? (
                   <>
@@ -380,16 +503,34 @@ export function Board({ level, render, cellSize }: BoardProps) {
             );
           })}
 
+        {/* A flat yellow oval always sits on the floor under the explorer so it's
+            instantly findable. Perspective (top-down-ish board) reads the circle
+            as an oval. Below the sprite; tracks the feet via charStyle. */}
+        <div className="player-oval" style={charStyle(render.player, cell)} aria-hidden="true" />
+
         {/* Explorer — faces its last move direction. */}
         <div
           className="sprite sprite--player"
-          style={{ ...spriteStyle(render.player, cell), opacity: render.playerOpacity }}
+          style={{ ...charStyle(render.player, cell), opacity: render.playerOpacity }}
         >
           <span className="sprite__shadow" />
           <span className="sprite__body" style={mirrorStyle(render.playerFacing)}>
             <ExplorerSprite size={charSize} />
           </span>
         </div>
+
+        {/* Opt-in click-to-move arrows on every reachable tile. Only while it's
+            the player's settled turn, so mid-animation clicks can't queue moves. */}
+        {moveArrows && interactive && onMove && (
+          <MoveArrows
+            level={level}
+            player={render.player}
+            monsters={render.monsters}
+            gatesOpen={render.gatesOpen}
+            cell={cell}
+            onMove={onMove}
+          />
+        )}
 
         {/* Chess.com-style planning arrows (right-click-drag). UI only. When an
             arrow starts on a MUMMY and ends on where that mummy's deterministic

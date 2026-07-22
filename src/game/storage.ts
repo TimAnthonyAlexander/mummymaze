@@ -12,6 +12,8 @@ export const STORAGE_KEY = 'maze-escape:v1';
 export interface Settings {
   sound: boolean;
   animations: boolean;
+  /** Show clickable move arrows on the tiles the explorer can step to. */
+  moveArrows: boolean;
 }
 
 export interface SaveData {
@@ -30,7 +32,7 @@ export function defaultSave(): SaveData {
     unlockedLevelIds: [],
     bestMoves: {},
     completedLevelIds: [],
-    settings: { sound: true, animations: true },
+    settings: { sound: true, animations: true, moveArrows: false },
   };
 }
 
@@ -78,6 +80,7 @@ function toSettings(v: unknown): Settings {
   return {
     sound: typeof v.sound === 'boolean' ? v.sound : base.sound,
     animations: typeof v.animations === 'boolean' ? v.animations : base.animations,
+    moveArrows: typeof v.moveArrows === 'boolean' ? v.moveArrows : base.moveArrows,
   };
 }
 
