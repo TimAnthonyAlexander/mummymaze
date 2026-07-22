@@ -75,7 +75,12 @@ export function MobileShell({
       sx={{
         display: 'flex',
         flexDirection: 'column',
+        // Use the SMALL viewport height (svh): the height with the browser's
+        // chrome shown, so nothing is ever hidden under iOS 26 Safari's floating
+        // nav bar. Fall back to vh on older engines that lack svh.
         height: '100vh',
+        minHeight: '100svh',
+        maxHeight: '100svh',
         width: '100vw',
         overflow: 'hidden',
       }}
@@ -123,7 +128,14 @@ export function MobileShell({
         />
       </Box>
 
-      <Box sx={{ py: 1.5, flexShrink: 0 }}>
+      <Box
+        sx={{
+          pt: 1.5,
+          // Keep the movement wheel above the home indicator / floating nav.
+          pb: 'calc(12px + env(safe-area-inset-bottom))',
+          flexShrink: 0,
+        }}
+      >
         <Controls
           compact
           onMove={onMove}
