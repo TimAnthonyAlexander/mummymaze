@@ -8,14 +8,24 @@
  * Undo / restart / load are instant: they cancel any running animation and snap
  * the render to the target state.
  */
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import {
   type Action,
   type Dir,
   type GameState,
   type Level,
+  type Pos,
   type TraceEvent,
   initGame,
+  samePos,
   stepWithTrace,
 } from '../engine';
 import { type RenderState, toRender } from './render';
@@ -25,6 +35,12 @@ import { loadSave } from './storage';
 const HOP_MS = 135; // per single-tile hop
 const KILL_MS = 110; // pause when a monster is destroyed
 const INITIAL_MS = 24; // let the pre-move frame paint before the first hop
+
+// Spawn-in intro (view-only pre-roll; see playSpawn).
+const SPAWN_HOP_MS = 125; // per walk-in hop (>= the sprite CSS transition, so it reads as hops)
+const SPAWN_HOLD_MS = 150; // beat of total darkness before the explorer starts walking
+const SPAWN_REVEAL_MS = 380; // lights-on fade (must exceed the .board__spawn CSS transition)
+const MAX_SPAWN_HOPS = 4; // cap the walk-in so the intro stays snappy on wide boards
 
 interface Frame {
   dur: number;
@@ -42,6 +58,23 @@ function animationsEnabled(): boolean {
   }
 }
 
+/** True when the OS asks for reduced motion (spawn intro is skipped if so). */
+function prefersReducedMotion(): boolean {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Play the spawn walk-in only when animations are on and motion isn't reduced. */
+function spawnMotionOK(): boolean {
+  return animationsEnabled() && !prefersReducedMotion();
+}
+
 /** The settle SFX for a turn's final phase (win / lose), or none. */
 function settleSound(phase: GameState['phase']): (() => void) | null {
   if (phase === 'won') return sfx.win;
@@ -57,11 +90,26 @@ function setActorPos(r: RenderState, actor: string, to: RenderState['player']): 
   };
 }
 
-function setDead(r: RenderState, id: string): RenderState {
-  return {
-    ...r,
-    monsters: r.monsters.map((m) => (m.id === id ? { ...m, alive: false } : m)),
-  };
+/**
+ * A collision "crash": flag the destroyed monster for a squash-and-fade knockout
+ * (kept alive so its sprite is still drawn through the animation — the settled
+ * final render removes it, staying in sync with the engine), give the survivor a
+ * brief recoil pulse, and kick up a dust puff at the impact tile. The survivor is
+ * whichever living monster shares the collision tile and isn't the loser.
+ */
+function applyCrash(r: RenderState, loserId: string, tile: Pos | null): RenderState {
+  const winner = tile
+    ? r.monsters.find((m) => m.alive && m.id !== loserId && samePos(m.pos, tile))
+    : undefined;
+  const monsters = r.monsters.map((m) => {
+    if (m.id === loserId) return { ...m, fx: 'knockout' as const };
+    if (winner && m.id === winner.id) return { ...m, fx: 'recoil' as const };
+    return m;
+  });
+  const puffs = tile
+    ? [...r.puffs, { id: `puff-${loserId}-${tile.x}-${tile.y}`, pos: tile }]
+    : r.puffs;
+  return { ...r, monsters, puffs };
 }
 
 /** Mutations + sounds gathered for one simultaneity tick. */
@@ -80,6 +128,7 @@ function buildFrames(trace: readonly TraceEvent[]): Frame[] {
   const rounds = new Map<number, Round>();
   const exits: { path: readonly RenderState['player'][] }[] = [];
   let lastRound = 0;
+  let lastMoveTo: Pos | null = null; // most recent hop's destination (the crash tile)
   let monsterSounded = false; // one monster thump per turn
 
   const bucket = (round: number): Round => {
@@ -97,6 +146,7 @@ function buildFrames(trace: readonly TraceEvent[]): Frame[] {
         const b = bucket(ev.round);
         lastRound = ev.round;
         const { actor, to } = ev;
+        lastMoveTo = to;
         b.applies.push((r) => setActorPos(r, actor, to));
         if (actor === 'player') {
           b.sounds.push(sfx.step);
@@ -115,8 +165,9 @@ function buildFrames(trace: readonly TraceEvent[]): Frame[] {
       }
       case 'kill': {
         const b = bucket(lastRound);
-        const { actor } = ev;
-        b.applies.push((r) => setDead(r, actor));
+        const loserId = ev.actor;
+        const tile = lastMoveTo;
+        b.applies.push((r) => applyCrash(r, loserId, tile));
         b.sounds.push(sfx.merge);
         b.hasKill = true;
         break;
@@ -218,6 +269,7 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
   const historyRef = useRef(history);
   historyRef.current = history;
   const animatingRef = useRef(false);
+  const spawningRef = useRef(false); // true only while the spawn-in intro plays
   const timerRef = useRef<number | null>(null);
   const playerFacingRef = useRef<Dir>('S');
 
@@ -265,14 +317,73 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
     (target: GameState) => {
       cancel();
       animatingRef.current = false;
+      spawningRef.current = false;
       setAnimating(false);
       setRender(toRender(target));
     },
     [cancel],
   );
 
+  /**
+   * The one-time spawn-in intro: the board starts in total darkness while the
+   * explorer walks in from just off the right edge, hopping west along its start
+   * row into its real cell, then the lights lift (a full reveal on lit levels; the
+   * normal torch view on dark ones). It is a pure visual pre-roll — the committed
+   * engine state is already the true start — so any input cancels it (see `move`).
+   * With animations off or reduced motion, we just snap to the settled board.
+   */
+  const playSpawn = useCallback(
+    (startState: GameState) => {
+      if (!spawnMotionOK()) {
+        snap(startState);
+        return;
+      }
+      const lvl = startState.level;
+      const start = startState.player;
+      const offX = Math.min(lvl.width, start.x + MAX_SPAWN_HOPS);
+      const base = toRender(startState);
+      if (offX <= start.x) {
+        // No room to walk in (start already at/over the right edge): just reveal.
+        snap(startState);
+        return;
+      }
+      const startRender: RenderState = {
+        ...base,
+        spawn: 'dark',
+        playerFacing: 'W',
+        player: { x: offX, y: start.y },
+      };
+      const frames: Frame[] = [{ dur: SPAWN_HOLD_MS, apply: (r) => r }];
+      for (let x = offX - 1; x >= start.x; x--) {
+        const px = x;
+        frames.push({
+          dur: SPAWN_HOP_MS,
+          apply: (r) => ({ ...r, player: { x: px, y: start.y }, playerFacing: 'W' }),
+          sound: sfx.step,
+        });
+      }
+      // Lights on: lift the black overlay. The explorer is already home.
+      frames.push({ dur: SPAWN_REVEAL_MS, apply: (r) => ({ ...r, spawn: 'reveal' }) });
+      spawningRef.current = true;
+      play(frames, startRender, base, () => {
+        spawningRef.current = false;
+      });
+    },
+    [play, snap],
+  );
+
+  /** Cut the intro short and settle on the committed start (called on any input). */
+  const finishSpawn = useCallback(() => {
+    cancel();
+    spawningRef.current = false;
+    animatingRef.current = false;
+    setAnimating(false);
+    setRender(toRender(historyRef.current.present));
+  }, [cancel]);
+
   const move = useCallback(
     (action: Action) => {
+      if (spawningRef.current) finishSpawn(); // any input skips the spawn intro
       if (animatingRef.current) return; // input locked during a turn's animation
       const present = historyRef.current.present;
       if (present.phase !== 'player') return;
@@ -301,7 +412,7 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
       }
       play(buildFrames(trace), startRender, finalRender, settle);
     },
-    [play, snap],
+    [play, snap, finishSpawn],
   );
 
   const undo = useCallback(() => {
@@ -319,10 +430,22 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
   const load = useCallback(
     (l: Level) => {
       dispatch({ type: 'load', level: l });
-      snap(initGame(l));
+      // A freshly loaded level is a fresh start: play the spawn-in intro.
+      playSpawn(initGame(l));
     },
-    [snap],
+    [playSpawn],
   );
+
+  // Play the spawn intro once when the game first mounts. useLayoutEffect so the
+  // first (dark) frame paints before the browser shows the revealed board — no
+  // flash of the lit board before darkness. Undo/restart/replay never re-trigger.
+  const playSpawnRef = useRef(playSpawn);
+  playSpawnRef.current = playSpawn;
+  useLayoutEffect(() => {
+    playSpawnRef.current(historyRef.current.present);
+    return cancel;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => cancel, [cancel]);
 

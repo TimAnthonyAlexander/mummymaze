@@ -175,6 +175,84 @@
   z-index: 1;
 }
 
+/* Crash-effect wrapper around a monster's shadow + body. Normally inert; the
+   collision animations live HERE (not on the outer .sprite, which owns the
+   position transform, nor on .sprite__body, which owns the facing mirror) so the
+   squash/pulse never fights either. Pivot near the feet so a knockout squashes
+   down onto the tile. Shadow squashes with it — fine, the monster is dying. */
+.sprite__fx {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 82%;
+}
+/* Loser: squash flat, sink slightly, and fade out — no rotation (a rotate would
+   spin the separate baked ground shadow). `forwards` holds it shrunk-to-nothing
+   until the settled render drops the sprite (kept in sync with the engine). */
+.sprite__fx.fx-knockout {
+  animation: fx-knockout 240ms ease-in forwards;
+}
+@keyframes fx-knockout {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  22% {
+    transform: scale(1.12, 0.82);
+  }
+  100% {
+    transform: translateY(14%) scale(0.28, 0.18);
+    opacity: 0;
+  }
+}
+/* Survivor: a quick recoil pulse (squash-and-settle) on impact. */
+.sprite__fx.fx-recoil {
+  animation: fx-recoil 220ms ease-out;
+}
+@keyframes fx-recoil {
+  0% {
+    transform: scale(1);
+  }
+  30% {
+    transform: scale(1.14, 0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Sandy dust cloud at a collision tile. Positioned with left/top (NOT transform)
+   so the expand-and-fade keyframe owns the transform. Sits below the sprites. */
+.crash-puff {
+  position: absolute;
+  width: var(--cell);
+  height: var(--cell);
+  z-index: 5;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 55%,
+    rgba(214, 190, 142, 0.85) 0%,
+    rgba(198, 168, 116, 0.55) 38%,
+    rgba(150, 120, 74, 0.28) 62%,
+    rgba(150, 120, 74, 0) 78%
+  );
+  transform-origin: 50% 55%;
+  animation: crash-puff 380ms ease-out forwards;
+}
+@keyframes crash-puff {
+  0% {
+    transform: scale(0.35);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
 .sprite--player {
   z-index: 7;
 }
@@ -297,6 +375,29 @@
   fill: var(--annot-blue);
   fill-opacity: 0.2;
   stroke: var(--annot-blue);
+}
+
+/* ── Spawn-in intro ────────────────────────────────────────────────────────
+   A full-black curtain over the play field for the one-time walk-in. z-index 6
+   sits above walls/gates/exit and the monsters (also z6; this element is drawn
+   after them in the DOM) but below the explorer (z7), so only the walking-in
+   explorer shows against the darkness. `--reveal` fades it out to lift the lights
+   — on a dark level the normal torch overlay (z5) underneath is what remains. */
+.board__spawn {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 6;
+  pointer-events: none;
+  background: #000;
+  border-radius: 2px;
+}
+.board__spawn--dark {
+  opacity: 1;
+}
+.board__spawn--reveal {
+  opacity: 0;
+  transition: opacity 340ms ease-out;
 }
 
 /* ── Dark / flashlight levels (SPEC §2.7) ──────────────────────────────────

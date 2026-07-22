@@ -473,13 +473,29 @@ export function Board({
           </>
         )}
 
+        {/* Dust puffs kicked up where two monsters crashed together. A separate,
+            self-animating layer (below the sprites) so it neither forces a board
+            re-render nor drags on the memoized floor/wall layers. */}
+        {render.puffs.map((p) => (
+          <div
+            key={p.id}
+            className="crash-puff"
+            style={{ left: p.pos.x * cell, top: p.pos.y * cell }}
+            aria-hidden="true"
+          />
+        ))}
+
         {/* Monsters — each turns to face the player it is hunting. In the dark,
-            a monster outside the torchlight shows only as faint glowing eyes. */}
+            a monster outside the torchlight shows only as faint glowing eyes.
+            The `.sprite__fx` wrapper carries the crash animation (squash+fade for
+            a knockout, a quick pulse for the survivor) so it never fights the
+            outer position transform or the body's facing mirror. */}
         {render.monsters
           .filter((m) => m.alive)
           .map((m) => {
             const lit = !dark || isLit(render.player, m.pos, dark.radius);
             const facing = mirrorStyle(faceToward(m.pos, render.player));
+            const fxClass = m.fx ? ` fx-${m.fx}` : '';
             return (
               <div
                 key={m.id}
@@ -487,12 +503,12 @@ export function Board({
                 style={charStyle(m.pos, cell)}
               >
                 {lit ? (
-                  <>
+                  <span className={`sprite__fx${fxClass}`}>
                     <span className="sprite__shadow" />
                     <span className="sprite__body" style={facing}>
                       <MonsterSprite kind={m.kind} size={charSize} />
                     </span>
-                  </>
+                  </span>
                 ) : (
                   <span className="dark-eyes" style={facing}>
                     <span className="dark-eye" />
@@ -518,6 +534,18 @@ export function Board({
             <ExplorerSprite size={charSize} />
           </span>
         </div>
+
+        {/* Spawn-in intro: a full-black curtain over the whole field (above walls,
+            gates, exit, and monsters at z6, but below the explorer at z7 so it can
+            be seen walking in). `--dark` is opaque; `--reveal` fades it out to lift
+            the lights (revealing the board, or the torch view on dark levels). */}
+        {render.spawn && (
+          <div
+            className={`board__spawn board__spawn--${render.spawn}`}
+            style={{ width: cell * level.width, height: cell * level.height }}
+            aria-hidden="true"
+          />
+        )}
 
         {/* Opt-in click-to-move arrows on every reachable tile. Only while it's
             the player's settled turn, so mid-animation clicks can't queue moves. */}
