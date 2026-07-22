@@ -1,0 +1,99 @@
+/* Ornate Egyptian cabinet frame. All bands/braids/rosettes are tileable SVG data
+   URIs set as CSS custom properties in BoardFrame.tsx. The dark carved stone is
+   the frame base; the frieze/braid/rosette sit on top of it along each edge. */
+
+.frame {
+  position: relative;
+  display: inline-block;
+  padding: var(--frame);
+  border-radius: 10px;
+  background-color: #3a2a17;
+  background-image: var(--frame-stone);
+  background-size: 150px;
+  /* Raised cabinet: lit top-left bevel, shadowed bottom-right, deep cast shadow,
+     and a hard dark rim so it reads as a solid block around the field. */
+  box-shadow:
+    inset 2px 2px 0 rgba(214, 190, 138, 0.25),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(20, 12, 4, 0.6),
+    0 16px 40px rgba(0, 0, 0, 0.6);
+  isolation: isolate;
+}
+
+/* Hieroglyph frieze along the top and bottom, between the two corner rosettes. */
+.frame__band {
+  position: absolute;
+  left: var(--frame);
+  right: var(--frame);
+  height: var(--frame);
+  background-image: var(--frieze);
+  background-repeat: repeat-x;
+  background-position: center;
+  /* Scale the 200×44 tile so its height fills the band. */
+  background-size: auto 100%;
+  z-index: 2;
+}
+.frame__band--top {
+  top: 0;
+}
+.frame__band--bottom {
+  bottom: 0;
+}
+
+/* Twisted-rope braids down the left and right sides, between the corners. */
+.frame__braid {
+  position: absolute;
+  top: var(--frame);
+  bottom: var(--frame);
+  width: var(--frame);
+  background-image: var(--braid);
+  background-repeat: repeat-y;
+  background-position: center;
+  background-size: 100% auto;
+  z-index: 2;
+}
+.frame__braid--left {
+  left: 0;
+}
+.frame__braid--right {
+  right: 0;
+  transform: scaleX(-1);
+}
+
+/* Sun-disc rosette in each corner, sitting over the frieze/braid junction. */
+.frame__corner {
+  position: absolute;
+  width: var(--frame);
+  height: var(--frame);
+  background-image: var(--rosette);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 86% 86%;
+  z-index: 3;
+}
+.frame__corner--tl {
+  top: 0;
+  left: 0;
+}
+.frame__corner--tr {
+  top: 0;
+  right: 0;
+}
+.frame__corner--bl {
+  bottom: 0;
+  left: 0;
+}
+.frame__corner--br {
+  bottom: 0;
+  right: 0;
+}
+
+/* The play field sits here, in a dark recessed groove so the frame reads raised. */
+.frame__inner {
+  position: relative;
+  z-index: 1;
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 2px rgba(18, 11, 3, 0.75),
+    inset 0 0 10px rgba(0, 0, 0, 0.5);
+}

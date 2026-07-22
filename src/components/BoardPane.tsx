@@ -4,6 +4,7 @@ import { ArrowRight } from 'lucide-react';
 import type { GameState } from '../engine';
 import type { RenderState } from '../game/render';
 import { Board } from './Board';
+import { BoardFrame } from './BoardFrame';
 
 /** Padding (px) reserved around the square board inside the pane. */
 const PANE_PADDING = 32;
@@ -54,7 +55,11 @@ export function BoardPane({
   }, []);
 
   const gridDim = Math.max(state.level.width, state.level.height);
-  const available = Math.min(size.w, size.h) - PANE_PADDING - BOARD_CHROME;
+  // The ornate frame thickness scales with the pane (bounded), then reserves its
+  // own room so the framed board still fits — critical on narrow mobile.
+  const paneMin = Math.min(size.w, size.h);
+  const frame = paneMin > 0 ? Math.min(42, Math.max(18, Math.round(paneMin * 0.05))) : 0;
+  const available = paneMin - PANE_PADDING - BOARD_CHROME - frame * 2;
   const cellSize = gridDim > 0 && available > 0 ? Math.floor(available / gridDim) : 0;
 
   // Only reveal the end-of-level overlay once the turn's animation has settled
@@ -78,7 +83,9 @@ export function BoardPane({
     >
       {cellSize > 0 && (
         <Box sx={{ position: 'relative', overflow: 'visible' }}>
-          <Board level={state.level} render={render} cellSize={cellSize} />
+          <BoardFrame thickness={frame}>
+            <Board level={state.level} render={render} cellSize={cellSize} />
+          </BoardFrame>
           {done && (
             <Paper
               elevation={8}
@@ -115,6 +122,7 @@ export function BoardPane({
             </Paper>
           )}
         </Box>
+
       )}
     </Box>
   );

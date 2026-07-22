@@ -145,4 +145,6 @@ export const boardTextures = {
   floorB: encode(sandstoneTile('#b0945c', 0.0, 0.0, 19, 2)),
   wallTop: encode(sandstoneTile('#ccb184', -0.02, 0.04, 31, 2)),
   grain: encode(grainOverlay()),
+  // Dark, richer carved sandstone for the ornate cabinet frame around the board.
+  frameStone: encode(sandstoneTile('#4a3820', 0.04, 0.02, 53, 3)),
 } as const;
