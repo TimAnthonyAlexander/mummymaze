@@ -220,35 +220,70 @@
   }
 }
 
-/* Sandy dust cloud at a collision tile. Positioned with left/top (NOT transform)
-   so the expand-and-fade keyframe owns the transform. Sits below the sprites. */
-.crash-puff {
+/* Crash burst at a collision tile: a billowing GRAY smoke cloud plus a few gold
+   sparkles that fly outward. `.crash-fx` positions the whole burst on the tile
+   (no transform of its own) so the cloud's scale keyframe and each spark's
+   fly-out keyframe are independent. Above the sprites so the impact reads on top. */
+.crash-fx {
   position: absolute;
   width: var(--cell);
   height: var(--cell);
-  z-index: 5;
+  z-index: 8;
   pointer-events: none;
+}
+/* Billowing gray smoke — bigger and grayer than dust, held long enough to read. */
+.crash-puff {
+  position: absolute;
+  inset: -20%;
   border-radius: 50%;
   background: radial-gradient(
-    circle at 50% 55%,
-    rgba(214, 190, 142, 0.85) 0%,
-    rgba(198, 168, 116, 0.55) 38%,
-    rgba(150, 120, 74, 0.28) 62%,
-    rgba(150, 120, 74, 0) 78%
+    circle at 50% 50%,
+    rgba(236, 236, 240, 0.92) 0%,
+    rgba(176, 176, 184, 0.72) 32%,
+    rgba(116, 116, 124, 0.4) 56%,
+    rgba(90, 90, 98, 0.16) 72%,
+    rgba(90, 90, 98, 0) 82%
   );
   transform-origin: 50% 55%;
-  animation: crash-puff 380ms ease-out forwards;
+  animation: crash-puff 520ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
 }
 @keyframes crash-puff {
   0% {
-    transform: scale(0.35);
+    transform: scale(0.28) translateY(6%);
     opacity: 0;
   }
-  25% {
+  16% {
     opacity: 1;
   }
   100% {
-    transform: scale(1.5);
+    transform: scale(1.85) translateY(-10%);
+    opacity: 0;
+  }
+}
+/* Gold sparkles. Each is rotated to a fixed angle (--a) and flung outward by the
+   keyframe's translateX, so the burst radiates evenly from the impact point. */
+.crash-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 15%;
+  height: 15%;
+  margin: -7.5% 0 0 -7.5%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff4d2 0%, #ffd166 45%, rgba(255, 190, 70, 0) 72%);
+  animation: crash-spark 500ms ease-out forwards;
+}
+@keyframes crash-spark {
+  0% {
+    transform: rotate(var(--a)) translateX(4%) scale(0.2);
+    opacity: 0;
+  }
+  22% {
+    opacity: 1;
+    transform: rotate(var(--a)) translateX(38%) scale(1);
+  }
+  100% {
+    transform: rotate(var(--a)) translateX(98%) scale(0.15);
     opacity: 0;
   }
 }

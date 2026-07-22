@@ -1,4 +1,4 @@
-import { type CSSProperties, memo } from 'react';
+import { type CSSProperties, memo, useLayoutEffect, useRef } from 'react';
 import {
   type Dir,
   type Level,
@@ -22,18 +22,30 @@ function spriteStyle(pos: Pos, cell: number): CSSProperties {
   return { transform: `translate(${pos.x * cell}px, ${pos.y * cell}px)` };
 }
 
+/** Fixed radial angles (deg) for the sparkles flung from a crash impact. */
+const CRASH_SPARK_ANGLES = [8, 62, 128, 182, 246, 312];
+
+/** Per-hop compositor animation duration (Web Animations API), ~ the hop cadence. */
+const HOP_ANIM_MS = 130;
+
 /**
- * Like `spriteStyle` but nudges the whole sprite (body + shadow) slightly UP-LEFT
- * within its own tile, for a pre-rendered "standing in the cell" read. Used for
- * the player, monsters, and the start marker (which must track the feet) — NOT
- * for board furniture like the exit opening/beacon, which stay tile-aligned.
- * The vertical lift reads as depth; the horizontal nudge is small so sprites stay
- * centred left-to-right in the tile.
+ * The translate() for a sprite standing in `pos`. Nudged slightly UP-LEFT within
+ * its tile for a pre-rendered "standing in the cell" read — the vertical lift
+ * reads as depth; the horizontal nudge is small so sprites stay centred L-R.
  */
-function charStyle(pos: Pos, cell: number): CSSProperties {
+function charTranslate(pos: Pos, cell: number): string {
   const nudgeX = cell * 0.03;
   const nudgeY = cell * 0.07;
-  return { transform: `translate(${pos.x * cell - nudgeX}px, ${pos.y * cell - nudgeY}px)` };
+  return `translate(${pos.x * cell - nudgeX}px, ${pos.y * cell - nudgeY}px)`;
+}
+
+/**
+ * Like `spriteStyle` but with the standing-in-cell nudge. Used for the player,
+ * monsters, and the start marker (which must track the feet) — NOT for board
+ * furniture like the exit opening/beacon, which stay tile-aligned.
+ */
+function charStyle(pos: Pos, cell: number): CSSProperties {
+  return { transform: charTranslate(pos, cell) };
 }
 
 /** Cardinal direction from `from` toward `to`, by the dominant axis. */
@@ -447,6 +459,36 @@ export function Board({
     return [from, s1, to];
   };
 
+  // Robust sprite movement: drive each single-tile hop with the Web Animations
+  // API so it runs on the COMPOSITOR and stays smooth on slow (mobile) main
+  // threads. Relying on a CSS `transition` per setRender drops frames under load
+  // and the hop reads as a teleport — the exact "enemies look static on mobile"
+  // symptom. Compositor-driven WAAPI keeps each hop visible even when the main
+  // thread is janky. Multi-tile jumps (undo / restart / animations-off snap) are
+  // NOT animated; a 0-distance render change is a no-op.
+  const spriteEls = useRef(new Map<string, HTMLElement>());
+  const prevPos = useRef(new Map<string, Pos>());
+  const setSpriteEl = (id: string) => (el: HTMLElement | null) => {
+    if (el) spriteEls.current.set(id, el);
+    else spriteEls.current.delete(id);
+  };
+  useLayoutEffect(() => {
+    const hop = (id: string, pos: Pos) => {
+      const el = spriteEls.current.get(id);
+      const prev = prevPos.current.get(id);
+      prevPos.current.set(id, pos);
+      if (!el || !prev || typeof el.animate !== 'function') return;
+      if (Math.abs(pos.x - prev.x) + Math.abs(pos.y - prev.y) !== 1) return; // snap, don't animate
+      el.animate(
+        [{ transform: charTranslate(prev, cell) }, { transform: charTranslate(pos, cell) }],
+        { duration: HOP_ANIM_MS, easing: 'linear' },
+      );
+    };
+    hop('player', render.player);
+    hop('player-oval', render.player);
+    for (const m of render.monsters) if (m.alive) hop(m.id, m.pos);
+  }, [render, cell]);
+
   return (
     <div className="board" style={boardStyle}>
       {/* Static floor grid — memoized, so it never re-renders while a turn plays. */}
@@ -479,10 +521,15 @@ export function Board({
         {render.puffs.map((p) => (
           <div
             key={p.id}
-            className="crash-puff"
+            className="crash-fx"
             style={{ left: p.pos.x * cell, top: p.pos.y * cell }}
             aria-hidden="true"
-          />
+          >
+            <span className="crash-puff" />
+            {CRASH_SPARK_ANGLES.map((a) => (
+              <span key={a} className="crash-spark" style={{ '--a': `${a}deg` } as CSSProperties} />
+            ))}
+          </div>
         ))}
 
         {/* Monsters — each turns to face the player it is hunting. In the dark,
@@ -499,6 +546,7 @@ export function Board({
             return (
               <div
                 key={m.id}
+                ref={setSpriteEl(m.id)}
                 className={`sprite sprite--monster${lit ? '' : ' sprite--eyes'}`}
                 style={charStyle(m.pos, cell)}
               >
@@ -522,10 +570,16 @@ export function Board({
         {/* A flat yellow oval always sits on the floor under the explorer so it's
             instantly findable. Perspective (top-down-ish board) reads the circle
             as an oval. Below the sprite; tracks the feet via charStyle. */}
-        <div className="player-oval" style={charStyle(render.player, cell)} aria-hidden="true" />
+        <div
+          ref={setSpriteEl('player-oval')}
+          className="player-oval"
+          style={charStyle(render.player, cell)}
+          aria-hidden="true"
+        />
 
         {/* Explorer — faces its last move direction. */}
         <div
+          ref={setSpriteEl('player')}
           className="sprite sprite--player"
           style={{ ...charStyle(render.player, cell), opacity: render.playerOpacity }}
         >

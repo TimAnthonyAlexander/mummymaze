@@ -34,6 +34,7 @@ import { loadSave } from './storage';
 
 const HOP_MS = 135; // per single-tile hop
 const KILL_MS = 110; // pause when a monster is destroyed
+const CRASH_HOLD_MS = 360; // hold after a crash so the smoke + sparkles finish before settle
 const INITIAL_MS = 24; // let the pre-move frame paint before the first hop
 
 // Spawn-in intro (view-only pre-roll; see playSpawn).
@@ -119,7 +120,15 @@ interface Round {
   hasKill: boolean;
 }
 
-function buildFrames(trace: readonly TraceEvent[]): Frame[] {
+/** Add a crash burst (smoke + sparkles) at a tile to the render's puff list. */
+function addPuff(r: RenderState, id: string, pos: Pos): RenderState {
+  return { ...r, puffs: [...r.puffs, { id, pos }] };
+}
+
+function buildFrames(
+  trace: readonly TraceEvent[],
+  opts: { playerCrashTile?: Pos | null } = {},
+): Frame[] {
   // Batch the turn into rounds keyed by TraceMove.round so every monster steps
   // at the same tick (mummies twice, scorpions once) instead of one-after-
   // another. Gate/kill events attach to the round of the move that caused them.
@@ -190,6 +199,22 @@ function buildFrames(trace: readonly TraceEvent[]): Frame[] {
   for (const ex of exits) {
     for (const p of ex.path) frames.push({ dur: HOP_MS, apply: (r) => ({ ...r, player: p }) });
     frames.push({ dur: HOP_MS, apply: (r) => ({ ...r, playerOpacity: 0 }) });
+  }
+
+  const hadKill = [...rounds.values()].some((b) => b.hasKill);
+  // Player got caught (or walked onto a monster): a crash burst at the collision.
+  if (opts.playerCrashTile) {
+    const tile = opts.playerCrashTile;
+    frames.push({
+      dur: HOP_MS,
+      apply: (r) => addPuff(r, `puff-player-${tile.x}-${tile.y}`, tile),
+      sound: sfx.merge,
+    });
+  }
+  // Hold so the smoke + sparkles finish before the settle clears the puffs and
+  // drops the knocked-out sprite.
+  if (hadKill || opts.playerCrashTile) {
+    frames.push({ dur: CRASH_HOLD_MS, apply: (r) => r });
   }
   return frames;
 }
@@ -410,7 +435,13 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
         settle?.();
         return;
       }
-      play(buildFrames(trace), startRender, finalRender, settle);
+      // A monster catching the player (or the player walking onto one) is a crash
+      // too — burst smoke + sparkles at the collision tile before the overlay.
+      const caughtLoss =
+        next.phase === 'lost' &&
+        (next.lossReason === 'caught' || next.lossReason === 'walked-into-monster');
+      const playerCrashTile = caughtLoss ? next.player : null;
+      play(buildFrames(trace, { playerCrashTile }), startRender, finalRender, settle);
     },
     [play, snap, finishSpawn],
   );
