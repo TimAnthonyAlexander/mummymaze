@@ -168,17 +168,24 @@ no engine/mechanics changed. Key pieces:
   themed names, and defines the play/unlock order (`progressionOrder`,
   `nextInProgression`, `getPyramidOfLevel`, `pyramidLevelIds`, `displayName`,
   `levelNumberInPyramid`). Keep that exported API stable — the UI depends on it.
-- Current pack: **170 levels / 17 pyramids** (targeted 20; stopped at 17 by user
-  decision — the last 3 tiers were slow). Pyramids 1–2 are the hand-authored
-  teaching curriculum; 3–17 are generated. Every level is build-time verified:
-  solvable within the solver cap, **not** beeline-trivial, enemy close,
-  `par > manhattan`. Merges are never *required* in levels 1–6; from level 7 a
-  merge may be part of the intended solution.
+- Current pack: **180 levels / 18 pyramids** (10 levels each). Levels 1–9 are the
+  hand-authored teaching curriculum; the rest are generated. Every level is
+  build-time verified: solvable within the solver cap **under the current
+  collision rule**, **not** beeline-trivial, enemy close, `par > manhattan`.
+  Merges are never *required* in levels 1–6; from level 7 a merge may be part of
+  the intended solution.
+- **Board size ramps base→apex within each pyramid** (fewer squares on the lower
+  rungs, biggest at the apex — echoing the original's 6/8/10 lattices), set in
+  `tierPlan` in `scripts/generate-levels.mjs`. **Every pyramid's APEX (top rung)
+  is a DARK/flashlight level** (§2.7) — the biggest board, so a radius-2 torch
+  stays mostly dark; `pyramids.ts` sorts dark levels last so the gentler-`par`
+  apex lands at the top. (Superseded the old single all-dark "Lightless Vault"
+  pyramid.)
 - The generator proves quality: for each candidate it runs the real BFS solver
   (rejects if it hits the state cap = "intractable"), the beeline test (a naive
   walk-to-exit player must LOSE, or the level is a boring stroll), and a proximity
   check. Boards are capped at 12×12; difficulty rises via more monsters/walls/
-  traps/keys, not bigger boards.
+  traps/keys and the base→apex size ramp.
 
 ## Core mechanics (full detail in `docs/SPEC.md`)
 
@@ -190,9 +197,22 @@ no engine/mechanics changed. Key pieces:
   plays each sub-step SIMULTANEOUSLY across all monsters (see the trace `round`).
 - **Wall-bump wastes the turn like a wait** (player stays, monsters still move) —
   intentional, tactically useful. Implemented in `step.ts` (`blocked → 'wait'`).
-- Two monsters colliding: the mover survives, the other is destroyed (a "merge").
+- Two monsters colliding (a "merge"): a **mummy always beats a scorpion**
+  (regardless of who moved); a same-class collision is won by the mover. A
+  scorpion charging into a mummy is the one destroyed (and takes no further steps
+  that turn). Implemented in `step.ts` via `isMummy` (faithful to the original).
 - Keys toggle all gates when any entity enters the key tile. Traps kill the player
   only. Win by stepping through the exit border edge.
+- **Dead-state ankh:** when no winning move remains (`useHints`'s `solveFrom`
+  reports `unsolvable`), the sidebar `Ankh` turns blood-red and pulses — the
+  canonical "dead maze" tell. Presentational only (`Ankh.tsx` `dead` prop).
+- **Animations** (`useAnimatedGame.ts` + `Board.tsx/.css`, view-only): a
+  **spawn-in** intro (board starts black, explorer walks in from the right edge
+  to its start tile, then lights come up — full reveal on lit levels, torch view
+  on dark ones; one-time per load, skippable, snaps when animations off); the
+  **win-exit** walk; and a monster **crash** (loser squash-and-fade knockout +
+  survivor recoil + sandy dust puff on a `kill` trace event). All on non-memoized
+  layers so a turn still re-renders only sprite content.
 
 ## Gotchas (read these)
 
@@ -244,7 +264,7 @@ no engine/mechanics changed. Key pieces:
 - **`docs/solutions/*.md` are STALE** (old pre-rename level ids). Regenerate from
   the current pack if you need them; don't trust them as-is.
 - `pack.test.ts` SAMPLES levels (base+apex of each pyramid + a seeded subset), not
-  all 170 — keep it that way so the suite stays fast.
+  all 180 — keep it that way so the suite stays fast.
 - **Vite dep-cache corruption.** If the dev log shows "You are loading @emotion/react
   when it is already loaded" / "multiple copies of React" / "Invalid hook call" and
   the app renders as unstyled defaults, it's a stale optimize cache, not your code:

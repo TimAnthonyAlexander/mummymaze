@@ -132,9 +132,12 @@ Checked in this exact order:
 1. If the monster's new tile == the **player's tile** → **LOSE** (caught).
 2. If the monster's new tile == another **monster's tile** → **collision**:
    they fight and exactly **one monster is removed**, leaving a single monster
-   on that tile. (Deterministic rule: the *moving* monster survives, the
-   stationary one is destroyed. This is a modeling choice for an ambiguous
-   original behavior — see §7.) A destroyed monster no longer moves or threatens.
+   on that tile. Survivor rule (faithful to the original): a **mummy always
+   beats a scorpion** (the scorpion is destroyed) regardless of which one moved;
+   in a **same-class** collision (mummy↔mummy or scorpion↔scorpion) the *moving*
+   monster survives. A scorpion that charges into a mummy is the one destroyed,
+   so it also takes no further steps and cannot catch the player that turn. A
+   destroyed monster no longer moves or threatens.
 3. If the monster stepped on a **key** → toggle gates.
 4. Traps have no effect on monsters.
 
@@ -388,8 +391,9 @@ No backend; everything runs client-side.
 These are edge cases where original behavior is folk-knowledge or version-
 dependent. We pick one deterministic ruling and document it so tests can pin it:
 
-1. **Monster-vs-monster collision survivor.** We keep the *moving* monster and
-   destroy the stationary one. (Outcome rarely matters; determinism does.)
+1. **Monster-vs-monster collision survivor.** Faithful to the original: a
+   **mummy always beats a scorpion** (regardless of who moved); a same-class
+   collision is won by the *moving* monster. See §2.6.
 2. **Simultaneity of monster moves.** Monsters move **sequentially in a fixed
    order** (level definition order), full move each, with checks after every
    step — not truly simultaneously. Order can affect rare collision/key cases.
@@ -407,6 +411,12 @@ dependent. We pick one deterministic ruling and document it so tests can pin it:
    collisions, same win/lose, same `par`, same solver output. Only what the
    player can *see* differs. Tests pin this — a dark level and its lit twin
    produce identical `step()` traces.
+7. **Wall-bump wastes the turn.** A directional move into a wall/border/closed
+   gate is treated as a **wait**: the player stays and the monsters still move.
+   A mechanics-faithfulness pass weighed the original's likely no-op (turn not
+   consumed) against this; we deliberately **keep the wasted-turn ruling** — it's
+   tactically useful, players still have an explicit wait, and the whole solved
+   level pack is verified against it.
 
 ---
 
@@ -438,10 +448,13 @@ interface SaveData {
 - Levels grouped into "worlds" of increasing difficulty (e.g. introduce: basic
   chase → walls/dead-ends → two monsters → scorpions → traps → keys/gates →
   combinations → **darkness** (§2.7)).
-- **Dark levels** are grouped into their own dedicated pyramid. Because darkness
-  is a difficulty multiplier on its own, those levels are authored *easier* on
-  raw solvability (smaller boards, lower `par`) than lit levels of a comparable
-  slot.
+- **Dark levels** are the **apex (top rung) of every pyramid** — climbing a
+  pyramid ends in the dark. Board size climbs base→apex within a pyramid (fewer
+  squares on the lower rungs, biggest at the apex), so the dark apex is the
+  largest board and a radius-2 torch leaves most of it unseen. Darkness is a
+  difficulty multiplier on its own, so the apex's underlying layout is authored
+  gentler on raw solvability; `pyramids.ts` sorts dark levels last so the
+  gentler-`par` apex still lands at the top.
 - Each level may declare an optional `par` (a known-good move count) for a
   score/star rating. Since the engine is deterministic, `par` can be verified by
   a BFS solver in tests (see §10).
