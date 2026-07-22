@@ -150,16 +150,17 @@
 .sprite__shadow {
   position: absolute;
   left: 50%;
-  top: 72%;
-  width: 52%;
-  height: 20%;
+  top: 66%;
+  width: 66%;
+  height: 28%;
   transform: translateX(-50%);
   border-radius: 50%;
+  /* Larger, softer pre-baked blob — the main depth cue for the pre-rendered look. */
   background: radial-gradient(
     ellipse at center,
-    rgba(24, 16, 2, 0.42) 0%,
-    rgba(24, 16, 2, 0.3) 45%,
-    rgba(24, 16, 2, 0) 72%
+    rgba(22, 14, 2, 0.5) 0%,
+    rgba(22, 14, 2, 0.34) 40%,
+    rgba(22, 14, 2, 0) 72%
   );
   z-index: 0;
   pointer-events: none;

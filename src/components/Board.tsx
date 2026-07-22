@@ -1,4 +1,3 @@
-import { Key, Skull } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { type Dir, type Level, type Pos, monsterStep, samePos } from '../engine';
 import { isLit } from '../game/flashlight';
@@ -6,6 +5,7 @@ import type { RenderState } from '../game/render';
 import { boardTextures } from '../game/textures';
 import { BoardAnnotations } from './BoardAnnotations';
 import { ExplorerSprite, MonsterSprite } from './sprites/CharacterSprites';
+import { KeyDecal, TrapDecal } from './sprites/TileDecals';
 import './Board.css';
 
 function spriteStyle(pos: Pos, cell: number): CSSProperties {
@@ -183,7 +183,7 @@ export function Board({ level, render, cellSize }: BoardProps) {
     '--tex-grain': boardTextures.grain,
   } as CSSProperties;
 
-  const markerSize = Math.round(cell * 0.46);
+  const markerSize = Math.round(cell * 0.66);
   const charSize = Math.round(cell * 0.82);
   const walls = computeWallSegments(level);
 
@@ -230,12 +230,8 @@ export function Board({ level, render, cellSize }: BoardProps) {
             const checker = (x + y) % 2 === 0 ? 'cell--a' : 'cell--b';
             return (
               <div key={`${x},${y}`} className={`cell ${checker}`}>
-                {cellData.trap && (
-                  <Skull className="cell__marker" size={markerSize} color="#8a2b2b" />
-                )}
-                {cellData.key && (
-                  <Key className="cell__marker" size={markerSize} color="#c99a1e" />
-                )}
+                {cellData.trap && <TrapDecal className="cell__marker" size={markerSize} />}
+                {cellData.key && <KeyDecal className="cell__marker" size={markerSize} />}
               </div>
             );
           }),
@@ -382,18 +378,27 @@ export function Board({ level, render, cellSize }: BoardProps) {
  * border the exit sits on.
  */
 function ExitOpening({ pos, dir, cell }: { pos: Pos; dir: Dir; cell: number }) {
+  // Authored in "north" orientation (stairs descend toward the top border edge),
+  // then rotated onto whichever border the exit sits on. Stays WITHIN the tile so
+  // it never pokes into the ornate frame.
   const deg = dir === 'N' ? 0 : dir === 'E' ? 90 : dir === 'S' ? 180 : 270;
-  const depth = cell; // passage extends one tile outward
-  const x0 = cell * 0.2;
-  const x1 = cell * 0.8;
-  const w = x1 - x0;
   const cx = cell / 2;
+  const gid = `exitglow-${pos.x}-${pos.y}`;
 
-  const floor = '#f3e7c4';
-  const passage = '#f7eecb';
-  const wall = '#b08320';
-  const step = '#e4d3a4';
-  const green = '#3aa06a';
+  // A descending staircase in false perspective: near steps low and wide, far
+  // steps high and narrow, each a lit top face over a shadowed front riser, with
+  // a dark opening beyond and a warm daylight glow bleeding in.
+  const N = 4;
+  const steps = Array.from({ length: N }, (_, i) => {
+    const t0 = i / N;
+    const t1 = (i + 1) / N;
+    const y = cell * (0.7 - 0.52 * t0); // top face y (higher = further out)
+    const yNext = cell * (0.7 - 0.52 * t1);
+    const halfW = cell * (0.36 - 0.12 * t0);
+    const riser = y - yNext; // front face height
+    const shade = 0.62 - 0.12 * i;
+    return { y, halfW, riser, top: `rgb(${216 - i * 10},${192 - i * 12},${138 - i * 12})`, front: `rgba(70,50,24,${shade})` };
+  });
 
   return (
     <svg
@@ -401,37 +406,30 @@ function ExitOpening({ pos, dir, cell }: { pos: Pos; dir: Dir; cell: number }) {
       width={cell}
       height={cell}
       viewBox={`0 0 ${cell} ${cell}`}
-      style={{ ...spriteStyle(pos, cell), overflow: 'visible' }}
+      style={spriteStyle(pos, cell)}
     >
+      <defs>
+        <radialGradient id={gid} cx="50%" cy="18%" r="70%">
+          <stop offset="0%" stopColor="rgba(255,244,206,0.9)" />
+          <stop offset="45%" stopColor="rgba(246,222,150,0.5)" />
+          <stop offset="100%" stopColor="rgba(246,222,150,0)" />
+        </radialGradient>
+      </defs>
       <g transform={`rotate(${deg} ${cx} ${cx})`}>
-        {/* passage floor */}
-        <rect x={x0} y={-depth} width={w} height={depth} fill={passage} />
-        {/* cut the wall border so it reads as open */}
-        <rect x={x0} y={-6} width={w} height={12} fill={floor} />
-        {/* jambs */}
-        <rect x={x0 - 3} y={-depth} width={3} height={depth + 6} fill={wall} />
-        <rect x={x1} y={-depth} width={3} height={depth + 6} fill={wall} />
-        {/* steps */}
-        {[0.28, 0.52, 0.76].map((f) => (
-          <line
-            key={f}
-            x1={x0 + 2}
-            x2={x1 - 2}
-            y1={-depth * f}
-            y2={-depth * f}
-            stroke={step}
-            strokeWidth={2}
-          />
-        ))}
-        {/* outward chevron */}
-        <path
-          d={`M ${cx - 6} ${-depth + 10} L ${cx} ${-depth + 2} L ${cx + 6} ${-depth + 10}`}
-          fill="none"
-          stroke={green}
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        {/* warm daylight glow from beyond the opening */}
+        <rect x={0} y={0} width={cell} height={cell * 0.7} fill={`url(#${gid})`} />
+        {/* dark opening beyond the top step */}
+        <rect x={cx - cell * 0.24} y={0} width={cell * 0.48} height={cell * 0.2} fill="#1c1309" />
+        {/* receding steps, far (top) first so nearer steps overlap correctly */}
+        {steps
+          .slice()
+          .reverse()
+          .map((s, idx) => (
+            <g key={idx}>
+              <rect x={cx - s.halfW} y={s.y} width={s.halfW * 2} height={s.riser + 1} fill={s.front} />
+              <rect x={cx - s.halfW} y={s.y - cell * 0.045} width={s.halfW * 2} height={cell * 0.05} fill={s.top} />
+            </g>
+          ))}
       </g>
     </svg>
   );
