@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { type Dir, type Level, type Pos, monsterStep, samePos } from '../engine';
 import { isLit } from '../game/flashlight';
 import type { RenderState } from '../game/render';
+import { boardTextures } from '../game/textures';
 import { BoardAnnotations } from './BoardAnnotations';
 import { ExplorerSprite, MonsterSprite } from './sprites/CharacterSprites';
 import './Board.css';
@@ -176,6 +177,10 @@ export function Board({ level, render, cellSize }: BoardProps) {
     '--cols': level.width,
     '--rows': level.height,
     '--wall-extrude': extrudeShadow(wallLift, 'var(--wall-side)'),
+    '--tex-floor-a': boardTextures.floorA,
+    '--tex-floor-b': boardTextures.floorB,
+    '--tex-wall-top': boardTextures.wallTop,
+    '--tex-grain': boardTextures.grain,
   } as CSSProperties;
 
   const markerSize = Math.round(cell * 0.46);
@@ -238,6 +243,13 @@ export function Board({ level, render, cellSize }: BoardProps) {
       </div>
 
       <div className="board__overlay">
+        {/* Baked ambient occlusion vignette over the floor (below the walls). */}
+        <div
+          className="board__ao"
+          style={{ width: cell * level.width, height: cell * level.height }}
+          aria-hidden="true"
+        />
+
         {/* Extruded boundary walls — raised slabs lit from the top-left. Drawn
             in two planes so connected walls merge into one solid: every slab's
             down-right shadow sits on the lower plane, and every slab's flat top
@@ -281,6 +293,14 @@ export function Board({ level, render, cellSize }: BoardProps) {
             />
           );
         })}
+
+        {/* Unifying grain film over floor + stone (below sprites), so everything
+            shares one layer of early-2000s compression fuzz. */}
+        <div
+          className="board__grain"
+          style={{ width: cell * level.width, height: cell * level.height }}
+          aria-hidden="true"
+        />
 
         {/* Real opening in the border wall the explorer walks out through. */}
         <ExitOpening pos={level.exit.pos} dir={level.exit.dir} cell={cell} />
