@@ -1,4 +1,4 @@
-import { type CSSProperties, memo, useLayoutEffect, useRef } from 'react';
+import { type CSSProperties, Fragment, memo, useLayoutEffect, useRef } from 'react';
 import {
   type Dir,
   type Level,
@@ -14,7 +14,7 @@ import { isLit } from '../game/flashlight';
 import type { RenderState } from '../game/render';
 import { boardTextures } from '../game/textures';
 import { BoardAnnotations } from './BoardAnnotations';
-import { ExplorerSprite, MonsterSprite } from './sprites/CharacterSprites';
+import { ExplorerSprite, MonsterSprite, SpawnHead3D } from './sprites/CharacterSprites';
 import { KeyDecal, TrapDecal } from './sprites/TileDecals';
 import './Board.css';
 
@@ -395,26 +395,30 @@ const MoveArrows = memo(function MoveArrows({
 });
 
 /**
- * The spawn-intro enemy elevator. For each living enemy, draws its start tile as
- * a stone slab riding up out of a dark pit carrying the enemy (tile + enemy rise
- * together), then the enemy whips 180° around to face the player. Rendered only
- * during the spawn intro (the normal monster layer is suppressed meanwhile). All
- * motion is CSS (Board.css `spawn-rise` / `spawn-headturn`), triggered by the
- * phase-derived classes; the JS timeline in useAnimatedGame just advances phase.
+ * The spawn-intro enemy elevator. Each living enemy's start tile is a stone slab
+ * riding up out of a dark pit, carrying the enemy, then the enemy's head turns.
+ * Rendered only during the spawn intro (the normal monster layer is suppressed
+ * meanwhile). Phase → class:
  *   'reveal' → slabs held sunk in their pits (only the dark holes show).
- *   'rise'   → slabs + enemies grind up to flush.
- *   'turn'   → the risen enemies rotate to face the player.
- * A per-riser `clip-path` (Board.css) hides everything below the tile's floor
- * line, so a slab reads as emerging from the ground rather than sliding over the
- * tile beneath it.
+ *   'rise'   → slabs + enemies grind up to flush (slow linear stone rise).
+ *   'turn'   → the risen enemies' heads turn (SpawnHead3D).
+ *
+ * CRUCIAL layering: each enemy is drawn in TWO planes so the maze stays intact —
+ * a floor plane (pit + slab) BELOW the walls, so a wall touching this tile is
+ * never covered by the pit, and an enemy plane ABOVE the walls. Both use the SAME
+ * `.spawn-riser__lift` animation, so they rise in perfect lockstep.
  */
 function SpawnRisers({
   monsters,
+  player,
+  level,
   phase,
   cell,
   charSize,
 }: {
   monsters: RenderState['monsters'];
+  player: Pos;
+  level: Level;
   phase: 'reveal' | 'rise' | 'turn';
   cell: number;
   charSize: number;
@@ -433,35 +437,75 @@ function SpawnRisers({
     <>
       {monsters
         .filter((m) => m.alive)
-        .map((m) => (
-          <div
-            key={`riser-${m.id}`}
-            className="spawn-riser"
-            style={
-              {
-                transform: `translate(${m.pos.x * cell}px, ${m.pos.y * cell}px)`,
-                '--rise-depth': `${depth}px`,
-              } as CSSProperties
-            }
-            aria-hidden="true"
-          >
-            <span className="spawn-riser__pit" />
-            <span className={`spawn-riser__lift${liftClass}`}>
-              <span className="spawn-riser__block" />
-              <span
-                className="spawn-riser__sprite"
-                style={{ transform: `translate(${-nudgeX}px, ${-nudgeY}px)` }}
-              >
-                <span className="sprite__shadow" />
-                <span className={`spawn-riser__turn${turnActive}`}>
-                  <span className="sprite__body">
-                    <MonsterSprite kind={m.kind} size={charSize} />
+        .map((m) => {
+          const isMummy = m.kind.startsWith('mummy');
+          const variant = m.kind.endsWith('red') ? 'red' : 'white';
+          // The rising slab must match the CHECKER parity of the tile it lands on
+          // (BoardFloor: (x+y) even = floor A, odd = floor B), or it flashes the
+          // wrong floor colour until the intro settles into the real cell.
+          const blockKind = (m.pos.x + m.pos.y) % 2 === 0 ? 'a' : 'b';
+          // Face the player exactly as the settled monster will (mirrorStyle +
+          // faceToward), so the body doesn't flip L/R when the intro hands off to
+          // the normal monster layer. Applied to the whole turn wrapper (body +
+          // 3D head), so both match the mirrored settled sprite.
+          const facing = mirrorStyle(faceToward(m.pos, player));
+          const tileStyle = {
+            transform: `translate(${m.pos.x * cell}px, ${m.pos.y * cell}px)`,
+            '--rise-depth': `${depth}px`,
+          } as CSSProperties;
+          // Only raise the enemy plane's bottom clip when a horizontal wall is
+          // actually on this tile's south edge (so the rising enemy never covers
+          // its wall-top). With no such wall, keep the clip at the true floor line
+          // so the enemy's legs reach the floor instead of being cut short.
+          const sy = m.pos.y;
+          const sx = m.pos.x;
+          const southWall =
+            sy + 1 >= level.height ||
+            level.cells[sy][sx].walls.S ||
+            level.cells[sy + 1][sx].walls.N;
+          const enemyStyle = {
+            ...tileStyle,
+            '--enemy-clip-bottom': southWall ? 'calc(var(--cell) * 0.08)' : '0px',
+          } as CSSProperties;
+          return (
+            <Fragment key={`riser-${m.id}`}>
+              {/* Floor plane — BELOW the walls. The pit + the rising slab. */}
+              <div className="spawn-riser-floor" style={tileStyle} aria-hidden="true">
+                <span className="spawn-riser__pit" />
+                <span className={`spawn-riser__lift${liftClass}`}>
+                  <span className={`spawn-riser__block spawn-riser__block--${blockKind}`} />
+                </span>
+              </div>
+              {/* Enemy plane — ABOVE the walls. The sprite, rising in lockstep. */}
+              <div className="spawn-riser-enemy" style={enemyStyle} aria-hidden="true">
+                <span className={`spawn-riser__lift${liftClass}`}>
+                  <span
+                    className="spawn-riser__sprite"
+                    style={{ transform: `translate(${-nudgeX}px, ${-nudgeY}px)` }}
+                  >
+                    <span className="sprite__shadow" />
+                    <span className={`spawn-riser__turn${turnActive}`} style={facing}>
+                      <span className="sprite__body">
+                        <MonsterSprite kind={m.kind} size={charSize} />
+                      </span>
+                      {/* Head-turn: the flat head in the body SVG is hidden (CSS)
+                          and SpawnHead3D overlays in its place — a round ball whose
+                          front matches the flat head exactly, so there is no pop
+                          when it takes over or hands back, and whose outline never
+                          collapses while the face orbits away and the back of the
+                          head comes round. Mummies only (scorpions are top-down). */}
+                      {phase === 'turn' && isMummy && (
+                        <span className="spawn-riser__head3d">
+                          <SpawnHead3D variant={variant} size={charSize} durationMs={720} />
+                        </span>
+                      )}
+                    </span>
                   </span>
                 </span>
-              </span>
-            </span>
-          </div>
-        ))}
+              </div>
+            </Fragment>
+          );
+        })}
     </>
   );
 }
@@ -680,6 +724,8 @@ export function Board({
         {(render.spawn === 'reveal' || render.spawn === 'rise' || render.spawn === 'turn') && (
           <SpawnRisers
             monsters={render.monsters}
+            player={render.player}
+            level={level}
             phase={render.spawn}
             cell={cell}
             charSize={charSize}

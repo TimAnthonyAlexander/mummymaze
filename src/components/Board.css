@@ -455,40 +455,67 @@
 }
 
 /* ── Enemy elevator (spawn intro) ──────────────────────────────────────────
-   Each enemy's start tile is drawn as a stone slab riding up out of a dark pit,
-   carrying the enemy (tile + enemy rise together), then the enemy whips around
-   to face the player. Sits above the walls/exit AND the dark overlay (z6) so the
-   reveal is always visible, even on dark levels; the explorer (z7) still passes
-   in front. The clip-path is open ABOVE (the enemy pokes above its tile) but
-   clipped at the tile's bottom floor line, so a slab reads as rising out of the
-   ground rather than sliding over the tile beneath it. Only rendered during the
-   spawn intro (Board.tsx); the normal monster layer is suppressed meanwhile. */
-.spawn-riser {
+   Each enemy's start tile is a stone slab riding up out of a dark pit, carrying
+   the enemy, then the enemy's head turns. It is drawn in TWO planes at different
+   depths so the maze structure stays intact:
+
+   • `.spawn-riser-floor` (z1, BELOW the walls): the pit + the rising slab. Being
+     under the walls means a wall bordering this tile is NEVER blacked out — the
+     wall draws over the pit exactly as it draws over the floor. Clipped to the
+     tile so the slab can't spill onto neighbours.
+   • `.spawn-riser-enemy` (z6, ABOVE the walls): the enemy sprite, rising in sync
+     (same `.spawn-riser__lift` animation). Clipped open ABOVE but at the tile's
+     bottom floor line, so the enemy emerges from the ground.
+
+   Only rendered during the spawn intro (Board.tsx); the normal monster layer is
+   suppressed meanwhile. */
+.spawn-riser-floor,
+.spawn-riser-enemy {
   position: absolute;
   top: 0;
   left: 0;
   width: var(--cell);
   height: var(--cell);
-  z-index: 6;
   pointer-events: none;
-  clip-path: inset(-180% 0 0 0);
+}
+.spawn-riser-floor {
+  z-index: 1; /* below the walls (z2): the pit never covers a bordering wall */
+  clip-path: inset(0); /* the slab/pit stay within the tile */
+  /* The overlay these risers live in is offset +2px from the floor grid (its
+     top/left is 6px vs the board's 4px padding). Floating sprites don't care, but
+     the slab must EXACTLY overlap its grid cell — so pull the floor plane back by
+     that 2px, onto the real cell, or it lands 2px down-right and pops at hand-off.
+     The ENEMY plane is deliberately NOT shifted: it must match the settled monster,
+     which lives in this same offset overlay. */
+  top: -2px;
+  left: -2px;
+}
+.spawn-riser-enemy {
+  z-index: 6; /* above the walls: the enemy stands in front */
+  /* Open above (the enemy pokes up); clipped at the floor line. `--enemy-clip-bottom`
+     is set per enemy in Board.tsx: the wall's half-thickness ONLY when a horizontal
+     wall sits on this tile's south edge (so the rising enemy stops at the wall-top
+     instead of covering it), else 0 so the legs reach the true floor line. */
+  clip-path: inset(-180% 0 var(--enemy-clip-bottom, 0px) 0);
 }
 
-/* The dark shaft the slab rises through — a recessed hole punched in the floor. */
+/* The dark shaft the slab rises through — a recess in the floor (the walls frame
+   it from above, so it reads as a hole in the ground, not a black tile). */
 .spawn-riser__pit {
   position: absolute;
   inset: 0;
   z-index: 0;
   background: radial-gradient(
-    120% 120% at 50% 40%,
-    rgba(0, 0, 0, 0.92) 0%,
-    rgba(0, 0, 0, 0.8) 60%,
-    rgba(4, 3, 1, 0.62) 100%
+    120% 130% at 50% 34%,
+    rgba(0, 0, 0, 0.94) 0%,
+    rgba(6, 4, 1, 0.82) 62%,
+    rgba(10, 7, 2, 0.6) 100%
   );
-  box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.85);
+  box-shadow: inset 0 5px 9px rgba(0, 0, 0, 0.88);
 }
 
-/* The rising assembly: the slab + the enemy, moved together. Rests flush (0). */
+/* The rising assembly (slab OR enemy — one in each plane). Rests flush (0). Both
+   planes use this identical animation so they rise in perfect lockstep. */
 .spawn-riser__lift {
   position: absolute;
   inset: 0;
@@ -514,20 +541,27 @@
   }
 }
 
-/* The stone slab top face — the floor square that rides up. A lit top edge over
-   a shadowed underside so it reads as a solid block, not a flat tile. */
+/* The floor square that rides up. It is drawn PIXEL-IDENTICALLY to a static
+   `.cell` (same box-sizing, 1px grid border, texture + tile size, checker parity)
+   so that when it lands flush and the intro hands off to the real cell there is
+   NO pop — no phantom top-highlight/bottom-shadow, no offset. The slab never rises
+   ABOVE the floor (it stops exactly flush), so it needs no fake 3D block shading;
+   the dark pit behind it provides all the depth. */
 .spawn-riser__block {
   position: absolute;
   inset: 0;
-  background-color: var(--floor-a);
-  background-image: var(--tex-floor-a);
+  box-sizing: border-box;
+  border: 1px solid var(--grid-line);
   background-repeat: repeat;
   background-size: calc(var(--cell) * 1.35);
-  border-radius: 1px;
-  box-shadow:
-    inset 0 2px 0 rgba(255, 244, 214, 0.35),
-    inset 0 -3px 6px rgba(30, 18, 4, 0.55),
-    0 6px 10px rgba(0, 0, 0, 0.55);
+}
+.spawn-riser__block--a {
+  background-color: var(--floor-a);
+  background-image: var(--tex-floor-a);
+}
+.spawn-riser__block--b {
+  background-color: var(--floor-b);
+  background-image: var(--tex-floor-b);
 }
 
 /* The enemy standing on the slab — same box as a normal .sprite so the shared
@@ -539,46 +573,30 @@
   z-index: 1;
 }
 
-/* The menace beat: ONLY the enemy's head turns — a 180° twist and back — never
-   the whole body. The head is isolated as its own `.sprite-head` group inside the
-   SVG (CharacterSprites.tsx); here we spin JUST that group around the neck. The
-   whole sprite gets a brief red glow underneath so the menace still reads on
-   enemies with no distinct head (scorpions), which have no `.sprite-head`. */
+/* The menace beat: ONLY the enemy's HEAD turns (SpawnHead3D — a round ball whose
+   front matches the flat head exactly at rest, so there's no pop when it takes
+   over or hands back). The flat in-SVG head is hidden here while SpawnHead3D
+   overlays in its place. */
 .spawn-riser__turn {
   position: absolute;
   inset: 0;
 }
-.spawn-riser__turn--active {
-  animation: spawn-menace 560ms ease-in-out;
-}
+/* Hide the flat body-SVG head during the turn — the 3D head replaces it. */
 .spawn-riser__turn--active .sprite-head {
-  /* Pivot around the head's own bounding box, near its base (the neck). */
-  transform-box: fill-box;
-  transform-origin: 50% 92%;
-  animation: spawn-headturn 560ms ease-in-out;
+  opacity: 0;
 }
-@keyframes spawn-headturn {
-  0% {
-    transform: rotate(0deg);
-  }
-  42% {
-    transform: rotate(180deg);
-  }
-  58% {
-    transform: rotate(180deg);
-  }
-  100% {
-    transform: rotate(0deg);
-  }
-}
-@keyframes spawn-menace {
-  0%,
-  100% {
-    filter: none;
-  }
-  50% {
-    filter: drop-shadow(0 0 7px rgba(220, 40, 30, 0.9));
-  }
+
+/* Wrapper that centres the SpawnHead3D sphere over the (headless) body's head,
+   the same way .sprite__body centres the body SVG — so the turning head lands
+   exactly where the flat head was. The 3D is faked INSIDE the SVG (a round ball
+   with orbiting features), so no CSS 3D/perspective is needed here. */
+.spawn-riser__head3d {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 2; /* above the (headless) body */
 }
 
 /* ── Dark / flashlight levels (SPEC §2.7) ──────────────────────────────────

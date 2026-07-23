@@ -11,7 +11,7 @@
  * (duplicate ids in one document collide to the first match).
  */
 
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
 
 interface SpriteProps {
   size?: number;
@@ -219,6 +219,126 @@ export function MummySprite({
     </svg>
   );
 }
+
+/**
+ * The mummy's head turning a full 360° on the neck for the spawn intro. The head
+ * is drawn IDENTICALLY to MummySprite's flat head at rest (same gradient, skull,
+ * shade, wraps, slit, eyes) so when it takes over from — and hands back to — the
+ * flat head there is NO pop. The turn is the sphere trick a flat card can't do:
+ * the round skull silhouette stays put (a ball's outline never collapses), while
+ * only the FACE (slit + eyes) orbits across the surface — sliding by `sin`,
+ * foreshortening by `cos`, fading as it rounds the rim — and the back-of-head
+ * seam swings round through the far hemisphere. Fixed top-left light, as a real
+ * turning object has. Same 64×64 viewBox/size as MummySprite → exact overlay.
+ */
+export const SpawnHead3D = memo(function SpawnHead3D({
+  size = 48,
+  variant = 'white',
+  durationMs = 720,
+}: SpriteProps & { variant?: 'white' | 'red'; durationMs?: number }) {
+  const isRed = variant === 'red';
+  const base = isRed ? '#bb6349' : '#d9ccac';
+  const light = isRed ? '#d4886c' : '#f1e8cf';
+  const shade = isRed ? '#7c3826' : '#a5966a';
+  const band = isRed ? '#8a4531' : '#a99a6c';
+  const eye = isRed ? '#ffdc55' : '#ffd23f';
+  const gid = `sph-${variant}`;
+
+  const faceRef = useRef<SVGGElement>(null);
+  const seamRef = useRef<SVGGElement>(null);
+
+  useEffect(() => {
+    const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2);
+
+    // The whole FACE (slit + eyes, absolute coords centred on x=32) as one plate:
+    // foreshorten horizontally about x=32 by cos, slide by sin, fade at the rim.
+    // At a=0 this is the identity → pixel-identical to the flat head.
+    const placeFace = (g: SVGGElement | null, a: number) => {
+      if (!g) return;
+      const depth = Math.cos(a);
+      const sx = Math.max(0, depth);
+      const dx = 4.4 * Math.sin(a);
+      const op = Math.max(0, Math.min(1, (depth - 0.03) / 0.26));
+      g.style.opacity = String(op);
+      g.setAttribute('transform', `translate(${32 - 32 * sx + dx} 0) scale(${sx} 1)`);
+    };
+    // The back seam sits on the far pole (longitude π): visible while the face is
+    // away. Its content is centred at the origin, so translate + scaleX directly.
+    const placeSeam = (g: SVGGElement | null, a: number) => {
+      if (!g) return;
+      const ang = Math.PI + a;
+      const depth = Math.cos(ang);
+      const sx = Math.max(0.04, depth);
+      const dx = 5 * Math.sin(ang);
+      const op = Math.max(0, Math.min(1, (depth - 0.03) / 0.3));
+      g.style.opacity = String(op);
+      g.setAttribute('transform', `translate(${32 + dx} 12.5) scale(${sx} 1)`);
+    };
+
+    let raf = 0;
+    let start = 0;
+    const tick = (ts: number) => {
+      if (!start) start = ts;
+      const t = Math.min(1, (ts - start) / durationMs);
+      const a = 2 * Math.PI * easeInOut(t); // one full revolution
+      placeFace(faceRef.current, a);
+      placeSeam(seamRef.current, a);
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [durationMs, variant]);
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" aria-hidden="true">
+      <defs>
+        {/* EXACT MummySprite head gradient (not a sphere-special radial) so the
+            resting head is pixel-identical to the flat one. */}
+        <linearGradient id={gid} x1="0.1" y1="0" x2="0.85" y2="1">
+          <stop offset="0%" stopColor={light} />
+          <stop offset="50%" stopColor={base} />
+          <stop offset="100%" stopColor={shade} />
+        </linearGradient>
+        <clipPath id={`${gid}-clip`}>
+          <ellipse cx="32" cy="12.5" rx="6.4" ry="7" />
+        </clipPath>
+      </defs>
+
+      {/* neck (static — the twist axis) — same as the flat head */}
+      <path d="M28.5 18 L35.5 18 L35 23 L29 23 Z" fill={shade} opacity="0.7" />
+
+      {/* skull — same ellipse, gradient, and shade as the flat head. Its round
+          outline is the sphere: it never collapses while the face orbits. */}
+      <ellipse cx="32" cy="12.5" rx="6.4" ry="7" fill={`url(#${gid})`} />
+      <path d="M33 6 Q38.4 8 38.4 12.5 Q38.4 17 34 19 Z" fill={shade} opacity="0.45" />
+      {/* static wraps — exactly the flat head's */}
+      <path
+        d="M26 9 Q32 11 38 9 M26.5 15.5 Q32 17.5 37.5 15.5"
+        fill="none"
+        stroke={band}
+        strokeWidth="1.5"
+        opacity="0.85"
+        strokeLinecap="round"
+      />
+
+      {/* orbiting surface features, clipped to the ball so they can't spill */}
+      <g clipPath={`url(#${gid}-clip)`}>
+        {/* back-of-head seam on the far hemisphere */}
+        <g ref={seamRef} style={{ opacity: 0 }}>
+          <line x1="0" y1="-6.2" x2="0" y2="6.2" stroke={shade} strokeWidth="1.5" strokeLinecap="round" />
+        </g>
+        {/* the FACE — slit + eyes, EXACT flat-head coords; identity at rest */}
+        <g ref={faceRef} style={{ opacity: 1 }}>
+          <path d="M26 12.5 Q32 10.8 38 12.5 Q37.6 16.4 32 16.8 Q26.4 16.4 26 12.5 Z" fill="#20160c" opacity="0.92" />
+          <circle cx="29.4" cy="13.3" r="1.8" fill={eye} />
+          <circle cx="34.6" cy="13.3" r="1.8" fill={eye} />
+          <circle cx="28.9" cy="12.8" r="0.7" fill="#fff7db" />
+          <circle cx="34.1" cy="12.8" r="0.7" fill="#fff7db" />
+        </g>
+      </g>
+    </svg>
+  );
+});
 
 /** Scorpion — the slower pursuer. variant 'white' or 'red'. Drawn TOP-DOWN. */
 export function ScorpionSprite({
