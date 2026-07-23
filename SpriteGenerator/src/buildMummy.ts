@@ -112,7 +112,7 @@ export function buildMummy(variant: Variant): MummyRig {
   // ── arms (thrust forward in the pose), hung off the shoulder ends ────────
   const armGeo = new THREE.CapsuleGeometry(P.arm.radius, P.arm.length, 6, 16);
   disposables.push(armGeo);
-  const fistGeo = new THREE.SphereGeometry(P.arm.radius * 1.15, 12, 10);
+  const fistGeo = new THREE.SphereGeometry(P.arm.radius * 1.05, 12, 10);
   disposables.push(fistGeo);
   const armPivotX = T.shoulderRadius * T.chestWiden * P.arm.spread;
   function makeArm(side: -1 | 1): THREE.Group {

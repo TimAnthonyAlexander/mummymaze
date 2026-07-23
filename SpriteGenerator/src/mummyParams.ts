@@ -87,7 +87,7 @@ export const mummyParams: MummyParams = {
   torso: {
     waistRadius: 0.5,
     shoulderRadius: 0.8,
-    pelvisRadius: 0.58,
+    pelvisRadius: 0.5,
     bottomY: -0.92,
     hipY: -0.5,
     waistY: -0.24,
@@ -95,12 +95,12 @@ export const mummyParams: MummyParams = {
     shoulderY: 0.6,
     topY: 0.95,
     chestWiden: 1.12,
-    depthScale: 0.72,
+    depthScale: 0.52,
     y: 1.28,
   },
 
   arm: {
-    radius: 0.27,
+    radius: 0.22,
     length: 1.02,
     spread: 0.72,
     splay: 0.32,
@@ -109,10 +109,10 @@ export const mummyParams: MummyParams = {
   },
 
   leg: {
-    radius: 0.31,
+    radius: 0.26,
     length: 0.9,
     hipX: 0.32,
     hipDrop: 0.55,
-    footRadius: 0.34,
+    footRadius: 0.3,
   },
 };
