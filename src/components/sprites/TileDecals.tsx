@@ -29,6 +29,16 @@ const BONE_HI = '#efe4c8';
 const BONE = '#d5c49e';
 const BONE_SHADE = '#7e7052';
 
+/**
+ * The pit is AUTHORED at `PIT_AUTHORED_R` in the 64 viewBox and then scaled as
+ * one group, so its size is a single number to tune rather than fifteen
+ * co-dependent coordinates. Keep it clear of the tile edge: a wall slab straddles
+ * the cell boundary, and a pit that reaches the rim collides with it.
+ */
+const PIT_AUTHORED_R = 30;
+const PIT_R = 26;
+const PIT_SCALE = PIT_R / PIT_AUTHORED_R;
+
 /** Raised stone disc — the medallion plate the key sits on. */
 function Disc() {
   return (
@@ -43,46 +53,14 @@ function Disc() {
   );
 }
 
-/** Sunken pit with a skull at the bottom — marks a lethal trap tile. */
-export function TrapDecal({ size = 40, className }: DecalProps) {
+/**
+ * The hole itself, authored at `PIT_AUTHORED_R`. Rendered inside the scaling
+ * group in `TrapDecal`, so every coordinate and stroke width here is in authored
+ * units — never adjust these to resize the pit, change `PIT_R` instead.
+ */
+function PitBody() {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" className={className} aria-label="trap">
-      <defs>
-        <clipPath id="td-pit-clip">
-          <circle cx="32" cy="32" r="30" />
-        </clipPath>
-        {/* far inner wall lit at the bottom, near wall unlit at the top */}
-        <linearGradient id="td-pit-wall" x1="0" y1="0" x2="0.35" y2="1">
-          <stop offset="0" stopColor={PIT_WALL} stopOpacity="0" />
-          <stop offset="0.5" stopColor={PIT_WALL} stopOpacity="0" />
-          <stop offset="0.78" stopColor={PIT_WALL_LIT} stopOpacity="0.55" />
-          <stop offset="1" stopColor={PIT_WALL_LIT} stopOpacity="1" />
-        </linearGradient>
-        <radialGradient id="td-pit-floor" cx="0.44" cy="0.38" r="0.72">
-          <stop offset="0" stopColor={PIT_FLOOR} />
-          <stop offset="0.62" stopColor="#22190a" />
-          <stop offset="1" stopColor={PIT_FLOOR_DEEP} />
-        </radialGradient>
-        {/* the overhanging lip: hard shadow across the top of the opening */}
-        <linearGradient id="td-pit-overhang" x1="0.25" y1="0" x2="0.6" y2="1">
-          <stop offset="0" stopColor="#000000" stopOpacity="0.95" />
-          <stop offset="0.22" stopColor="#000000" stopOpacity="0.7" />
-          <stop offset="0.5" stopColor="#000000" stopOpacity="0.25" />
-          <stop offset="0.78" stopColor="#000000" stopOpacity="0" />
-        </linearGradient>
-        {/* edge vignette so nothing inside the hole reads as flat */}
-        <radialGradient id="td-pit-vignette" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0.45" stopColor="#000000" stopOpacity="0" />
-          <stop offset="0.82" stopColor="#000000" stopOpacity="0.32" />
-          <stop offset="1" stopColor="#000000" stopOpacity="0.75" />
-        </radialGradient>
-        <linearGradient id="td-bone" x1="0.25" y1="0" x2="0.7" y2="1">
-          <stop offset="0" stopColor={BONE_HI} />
-          <stop offset="0.5" stopColor={BONE} />
-          <stop offset="1" stopColor={BONE_SHADE} />
-        </linearGradient>
-      </defs>
-
+    <>
       <circle cx="32" cy="32" r="30" fill={PIT_FLOOR_DEEP} />
 
       <g clipPath="url(#td-pit-clip)">
@@ -138,6 +116,54 @@ export function TrapDecal({ size = 40, className }: DecalProps) {
       {/* crisp cut edge of the opening */}
       <circle cx="32" cy="32" r="30" fill="none" stroke={ENGRAVE} strokeWidth="1.5" opacity="0.85" />
       <path d="M7.4 33 A30 30 0 0 1 30.6 2.1" fill="none" stroke="#e3cfa4" strokeWidth="1.1" opacity="0.3" strokeLinecap="round" />
+    </>
+  );
+}
+
+/** Sunken pit with a skull at the bottom — marks a lethal trap tile. */
+export function TrapDecal({ size = 40, className }: DecalProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" className={className} aria-label="trap">
+      <defs>
+        <clipPath id="td-pit-clip">
+          <circle cx="32" cy="32" r="30" />
+        </clipPath>
+        {/* far inner wall lit at the bottom, near wall unlit at the top */}
+        <linearGradient id="td-pit-wall" x1="0" y1="0" x2="0.35" y2="1">
+          <stop offset="0" stopColor={PIT_WALL} stopOpacity="0" />
+          <stop offset="0.5" stopColor={PIT_WALL} stopOpacity="0" />
+          <stop offset="0.78" stopColor={PIT_WALL_LIT} stopOpacity="0.55" />
+          <stop offset="1" stopColor={PIT_WALL_LIT} stopOpacity="1" />
+        </linearGradient>
+        <radialGradient id="td-pit-floor" cx="0.44" cy="0.38" r="0.72">
+          <stop offset="0" stopColor={PIT_FLOOR} />
+          <stop offset="0.62" stopColor="#22190a" />
+          <stop offset="1" stopColor={PIT_FLOOR_DEEP} />
+        </radialGradient>
+        {/* the overhanging lip: hard shadow across the top of the opening */}
+        <linearGradient id="td-pit-overhang" x1="0.25" y1="0" x2="0.6" y2="1">
+          <stop offset="0" stopColor="#000000" stopOpacity="0.95" />
+          <stop offset="0.22" stopColor="#000000" stopOpacity="0.7" />
+          <stop offset="0.5" stopColor="#000000" stopOpacity="0.25" />
+          <stop offset="0.78" stopColor="#000000" stopOpacity="0" />
+        </linearGradient>
+        {/* edge vignette so nothing inside the hole reads as flat */}
+        <radialGradient id="td-pit-vignette" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0.45" stopColor="#000000" stopOpacity="0" />
+          <stop offset="0.82" stopColor="#000000" stopOpacity="0.32" />
+          <stop offset="1" stopColor="#000000" stopOpacity="0.75" />
+        </radialGradient>
+        <linearGradient id="td-bone" x1="0.25" y1="0" x2="0.7" y2="1">
+          <stop offset="0" stopColor={BONE_HI} />
+          <stop offset="0.5" stopColor={BONE} />
+          <stop offset="1" stopColor={BONE_SHADE} />
+        </linearGradient>
+      </defs>
+
+      {/* The pit scales as ONE group — clip path and stroke widths included. */}
+      <g transform={`translate(32 32) scale(${PIT_SCALE}) translate(-32 -32)`}>
+        <PitBody />
+      </g>
     </svg>
   );
 }
