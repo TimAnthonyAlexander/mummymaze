@@ -42,6 +42,8 @@ export interface MummyParams {
     chestY: number;
     shoulderY: number; // height of the widest point / arm line
     topY: number; // neck cap
+    /** stretches the whole torso vertically (1 = base). Height without girth. */
+    heightScale: number;
     /** slab squash of the revolved circle. */
     chestWiden: number;
     depthScale: number;
@@ -50,7 +52,9 @@ export interface MummyParams {
   };
 
   arm: {
-    radius: number;
+    radius: number; // upper-arm (shoulder) radius
+    /** wrist radius as a fraction of `radius` (limbs taper, they aren't tubes). */
+    wristScale: number;
     length: number;
     /** arms attach at shoulderRadius·chestWiden·spread. <1 tucks the pivot
      *  INSIDE the shoulder mass so the joint is buried (not visible from behind). */
@@ -64,13 +68,20 @@ export interface MummyParams {
   };
 
   leg: {
-    radius: number;
+    radius: number; // thigh radius
+    /** ankle radius as a fraction of `radius`. */
+    ankleScale: number;
     length: number;
     /** hip pivot: sideways (±X) and how far below torso centre it drops. */
     hipX: number;
     hipDrop: number;
-    /** foot cap radius (a chunky rounded boot). */
-    footRadius: number;
+    /** the foot: a flat shape that points FORWARD (+Z), not a ball. */
+    foot: {
+      length: number; // forward extent (+Z)
+      width: number; // side extent (X) — kept ≈ leg width so it never splays out
+      height: number; // thickness (Y) — flat
+      forward: number; // how far the foot sits ahead of the ankle
+    };
   };
 }
 
@@ -94,6 +105,7 @@ export const mummyParams: MummyParams = {
     chestY: 0.18,
     shoulderY: 0.6,
     topY: 0.95,
+    heightScale: 1.12,
     chestWiden: 1.12,
     depthScale: 0.52,
     y: 1.28,
@@ -101,6 +113,7 @@ export const mummyParams: MummyParams = {
 
   arm: {
     radius: 0.22,
+    wristScale: 0.8,
     length: 1.02,
     spread: 0.72,
     splay: 0.32,
@@ -110,9 +123,15 @@ export const mummyParams: MummyParams = {
 
   leg: {
     radius: 0.26,
-    length: 0.9,
+    ankleScale: 0.72,
+    length: 1.12,
     hipX: 0.32,
     hipDrop: 0.55,
-    footRadius: 0.3,
+    foot: {
+      length: 0.46,
+      width: 0.19,
+      height: 0.11,
+      forward: 0.13,
+    },
   },
 };

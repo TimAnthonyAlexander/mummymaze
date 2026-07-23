@@ -41,21 +41,21 @@ export interface SceneParams {
 
 export const sceneParams: SceneParams = {
   camera: {
-    elevationDeg: 70,
+    elevationDeg: 58,
     azimuthDeg: 0,
-    frustumHalf: 1.95,
+    frustumHalf: 2.15,
     distance: 20,
-    targetY: 1.1,
+    targetY: 1.15,
   },
   light: {
-    keyElevationDeg: 58,
-    keyAzimuthDeg: -42, // top-LEFT (west + north of the model)
-    keyIntensity: 2.1,
-    fillIntensity: 0.55,
+    keyElevationDeg: 82,
+    keyAzimuthDeg: 180,
+    keyIntensity: 2.3,
+    fillIntensity: 0.45,
     ambientIntensity: 0.55,
   },
-  renderPx: 256,
-  framePx: 64,
+  renderPx: 512,
+  framePx: 128,
   sharpen: 0.4,
 };
 

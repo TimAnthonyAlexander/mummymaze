@@ -49,6 +49,30 @@ function limbMaterial(tex: THREE.Texture): THREE.MeshStandardMaterial {
   });
 }
 
+/**
+ * A properly-modelled limb: a revolved solid that TAPERS from rTop (near end)
+ * to rBottom (far end) with rounded hemispherical caps — a real upper-arm/thigh
+ * shape, not a uniform tube. Centred on the origin, long axis on Y; the near end
+ * (rTop) is up (+Y), so it hangs from a joint pivot at y = +(length/2 + rTop).
+ */
+function taperedLimbGeo(rTop: number, rBottom: number, length: number): THREE.LatheGeometry {
+  const half = length / 2;
+  const cap = 6;
+  // Ordered BOTTOM → TOP so the lathe winds outward-facing normals (same sense
+  // as the torso profile). Top→bottom flips them inward and you see the inside.
+  const pts: THREE.Vector2[] = [];
+  for (let i = 0; i <= cap; i++) {
+    const a = (i / cap) * (Math.PI / 2); // bottom hemisphere: pole → equator
+    pts.push(new THREE.Vector2(Math.sin(a) * rBottom, -half - Math.cos(a) * rBottom));
+  }
+  pts.push(new THREE.Vector2(rTop, half)); // taper up the side
+  for (let i = 1; i <= cap; i++) {
+    const a = (i / cap) * (Math.PI / 2); // top hemisphere: equator → pole
+    pts.push(new THREE.Vector2(Math.cos(a) * rTop, half + Math.sin(a) * rTop));
+  }
+  return new THREE.LatheGeometry(pts, 22);
+}
+
 export function buildMummy(variant: Variant): MummyRig {
   const P = mummyParams;
   const disposables: Array<{ dispose(): void }> = [];
@@ -75,6 +99,7 @@ export function buildMummy(variant: Variant): MummyRig {
   body.add(torso);
 
   const T = P.torso;
+  const k = T.heightScale; // vertical stretch of the torso
   const profile: THREE.Vector2[] = [
     new THREE.Vector2(0.0, T.bottomY), // closed bottom pole (under the pelvis)
     new THREE.Vector2(T.pelvisRadius * 0.62, T.bottomY + 0.05),
@@ -89,6 +114,7 @@ export function buildMummy(variant: Variant): MummyRig {
     new THREE.Vector2(0.2, T.topY),
     new THREE.Vector2(0.0, T.topY + 0.04), // closed neck cap
   ];
+  for (const v of profile) v.y *= k; // stretch height without changing girth
   const torsoGeo = new THREE.LatheGeometry(profile, 28);
   disposables.push(torsoGeo);
   const torsoMesh = new THREE.Mesh(torsoGeo, skin);
@@ -97,7 +123,7 @@ export function buildMummy(variant: Variant): MummyRig {
 
   // ── head (isolated pivot, like the game's `.sprite-head`) ───────────────
   const head = new THREE.Group();
-  head.position.y = T.topY + P.head.lift;
+  head.position.y = T.topY * k + P.head.lift;
   torso.add(head);
 
   // The head is a plain sphere; the eyes/eye-band are PAINTED into headTex and
@@ -110,21 +136,23 @@ export function buildMummy(variant: Variant): MummyRig {
   head.add(headMesh);
 
   // ── arms (thrust forward in the pose), hung off the shoulder ends ────────
-  const armGeo = new THREE.CapsuleGeometry(P.arm.radius, P.arm.length, 6, 16);
+  const armWrist = P.arm.radius * P.arm.wristScale;
+  const armGeo = taperedLimbGeo(P.arm.radius, armWrist, P.arm.length);
   disposables.push(armGeo);
-  const fistGeo = new THREE.SphereGeometry(P.arm.radius * 1.05, 12, 10);
+  const fistGeo = new THREE.SphereGeometry(armWrist * 1.15, 14, 12);
   disposables.push(fistGeo);
   const armPivotX = T.shoulderRadius * T.chestWiden * P.arm.spread;
+  const armEnd = P.arm.length / 2 + armWrist; // distance from arm centre to wrist
   function makeArm(side: -1 | 1): THREE.Group {
     const shoulder = new THREE.Group();
-    shoulder.position.set(side * armPivotX, T.shoulderY, P.arm.shoulderZ);
+    shoulder.position.set(side * armPivotX, T.shoulderY * k, P.arm.shoulderZ);
     const arm = new THREE.Mesh(armGeo, skin);
     // hang below the pivot so the shoulder group is the true pivot point
     arm.position.y = -(P.arm.length / 2 + P.arm.radius);
     shoulder.add(arm);
-    // fist sits ON the arm's lower end cap (at -(length/2+radius) in arm-local)
+    // fist sits ON the wrist (the arm's tapered lower end)
     const fist = new THREE.Mesh(fistGeo, skin);
-    fist.position.y = -(P.arm.length / 2 + P.arm.radius);
+    fist.position.y = -armEnd;
     arm.add(fist);
     torso.add(shoulder);
     return shoulder;
@@ -132,23 +160,35 @@ export function buildMummy(variant: Variant): MummyRig {
   const shoulderL = makeArm(-1);
   const shoulderR = makeArm(1);
 
-  // ── legs ────────────────────────────────────────────────────────────────
-  const legGeo = new THREE.CapsuleGeometry(P.leg.radius, P.leg.length, 6, 16);
+  // ── legs (tapered thigh→ankle) + a flat forward-pointing foot ────────────
+  const ankle = P.leg.radius * P.leg.ankleScale;
+  const legGeo = taperedLimbGeo(P.leg.radius, ankle, P.leg.length);
   disposables.push(legGeo);
-  const bootGeo = new THREE.SphereGeometry(P.leg.footRadius, 14, 10);
-  disposables.push(bootGeo);
-  const hipYWorld = P.torso.y - P.leg.hipDrop;
+  const legEnd = P.leg.length / 2 + ankle; // arm-local y of the ankle
+
+  // Foot: a flattened capsule that runs FORWARD along Z (heel→toe), not a ball.
+  // Built along Y then rotated onto Z; its X width is kept ≈ the ankle so it
+  // never splays outward. z-flatten gives it a low, flat profile.
+  const F = P.leg.foot;
+  const footR = F.width; // cross-section radius (X, and pre-flatten Y)
+  const footStraight = Math.max(0.02, F.length - 2 * footR);
+  const footGeo = new THREE.CapsuleGeometry(footR, footStraight, 6, 16);
+  disposables.push(footGeo);
+
+  const hipYWorld = P.torso.y - P.leg.hipDrop * k;
   function makeLeg(side: -1 | 1): THREE.Group {
     const hip = new THREE.Group();
     hip.position.set(side * P.leg.hipX, hipYWorld, 0);
     const leg = new THREE.Mesh(legGeo, skin);
     leg.position.y = -(P.leg.length / 2 + P.leg.radius);
     hip.add(leg);
-    // chunky rounded foot on the lower cap — wrapped in the same bandages
-    const boot = new THREE.Mesh(bootGeo, skin);
-    boot.scale.set(1.05, 0.82, 1.25);
-    boot.position.set(0, -(P.leg.length / 2 + P.leg.radius), P.leg.footRadius * 0.35);
-    leg.add(boot);
+
+    const foot = new THREE.Mesh(footGeo, skin);
+    foot.rotation.x = Math.PI / 2; // long axis Y → Z (points forward)
+    foot.scale.set(1, 1, F.height / footR); // flatten the vertical (now object-Z)
+    foot.position.set(0, -legEnd + F.height * 0.4, F.forward);
+    leg.add(foot);
+
     body.add(hip);
     return hip;
   }

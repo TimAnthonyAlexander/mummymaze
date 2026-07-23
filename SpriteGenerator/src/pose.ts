@@ -36,6 +36,16 @@ export function applyPose(rig: MummyRig, clip: ClipName, t: number): void {
   rig.hipL.rotation.set(0, 0, 0);
   rig.hipR.rotation.set(0, 0, 0);
 
+  if (clip === 'headturn') {
+    // The spawn head-twist: the body stands (arms held forward + splayed) while
+    // ONLY the head spins a full 360° around the neck. head is an isolated pivot
+    // in the rig, so this rotates the skull + its painted face, nothing else.
+    rig.shoulderL.rotation.z = -splay;
+    rig.shoulderR.rotation.z = splay;
+    rig.head.rotation.y = TAU * t;
+    return;
+  }
+
   if (clip === 'idle') {
     // gentle breathing bob + a tiny arm sway; feet planted.
     const bob = Math.sin(phase) * 0.03;

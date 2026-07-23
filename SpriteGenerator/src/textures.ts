@@ -36,13 +36,13 @@ const PALETTES: Record<Variant, Palette> = {
     eyeDark: '#160f07',
   },
   red: {
-    base: '#c66a4b',
-    baseHi: '#d9855f',
-    line: '#20110a',
-    edge: '#e8a17c',
-    fleck: '#e0956f',
-    speck: '#7f4028',
-    eyeDark: '#120804',
+    base: '#bd4429',
+    baseHi: '#d65e40',
+    line: '#260904',
+    edge: '#e8825a',
+    fleck: '#d4694a',
+    speck: '#6c2413',
+    eyeDark: '#150502',
   },
 };
 

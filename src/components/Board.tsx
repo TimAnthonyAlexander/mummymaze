@@ -15,7 +15,18 @@ import { isLit } from '../game/flashlight';
 import type { RenderState } from '../game/render';
 import { boardTextures } from '../game/textures';
 import { BoardAnnotations } from './BoardAnnotations';
-import { ExplorerSprite, MonsterSprite, SpawnHead3D } from './sprites/CharacterSprites';
+import { ExplorerSprite, MonsterSprite } from './sprites/CharacterSprites';
+import {
+  MummySheet,
+  SpawnMummyHeadTurn,
+  MUMMY_WALK_FRAMES,
+  isMummyKind,
+  moveFacing,
+  mummyFacing,
+  mummyVariant,
+  mummyWalkRow,
+  type Facing8,
+} from './sprites/MummySheet';
 import { KeyDecal, TrapDecal } from './sprites/TileDecals';
 import './Board.css';
 
@@ -437,6 +448,8 @@ function SpawnRisers({
   const depth = Math.round(cell * 1.15);
   const nudgeX = cell * 0.03;
   const nudgeY = cell * 0.07;
+  const mummySize = Math.round(cell * 1.1);
+  const mummyNudgeY = 0;
   const liftClass =
     phase === 'reveal'
       ? ' spawn-riser__lift--down'
@@ -495,19 +508,34 @@ function SpawnRisers({
                     style={{ transform: `translate(${-nudgeX}px, ${-nudgeY}px)` }}
                   >
                     <span className="sprite__shadow" />
-                    <span className={`spawn-riser__turn${turnActive}`} style={facing}>
-                      <span className="sprite__body">
-                        <MonsterSprite kind={m.kind} size={charSize} />
-                      </span>
-                      {/* Head-turn: the flat head in the body SVG is hidden (CSS)
-                          and SpawnHead3D overlays in its place — a round ball whose
-                          front matches the flat head exactly, so there is no pop
-                          when it takes over or hands back, and whose outline never
-                          collapses while the face orbits away and the back of the
-                          head comes round. Mummies only (scorpions are top-down). */}
-                      {phase === 'turn' && isMummy && (
-                        <span className="spawn-riser__head3d">
-                          <SpawnHead3D variant={variant} size={charSize} durationMs={720} />
+                    <span
+                      className={`spawn-riser__turn${isMummy ? '' : turnActive}`}
+                      style={isMummy ? undefined : facing}
+                    >
+                      {isMummy ? (
+                        // The new mummy is the baked sheet. During 'turn' it plays
+                        // the baked HEAD-TURN clip (body still, head spins 360°) —
+                        // same model as the settled sprite, so the hand-off to the
+                        // normal layer has no pop.
+                        <span className="sprite__body" style={{ transform: `translateY(${mummyNudgeY}px)` }}>
+                          {phase === 'turn' ? (
+                            <SpawnMummyHeadTurn
+                              variant={variant}
+                              facing={mummyFacing(m.pos, player)}
+                              size={mummySize}
+                              durationMs={720}
+                            />
+                          ) : (
+                            <MummySheet
+                              variant={variant}
+                              facing={mummyFacing(m.pos, player)}
+                              size={mummySize}
+                            />
+                          )}
+                        </span>
+                      ) : (
+                        <span className="sprite__body">
+                          <MonsterSprite kind={m.kind} size={charSize} />
                         </span>
                       )}
                     </span>
@@ -558,6 +586,11 @@ export function Board({
 
   const markerSize = Math.round(cell * 0.66);
   const charSize = Math.round(cell * 0.82);
+  // The mummy is a baked sheet; the figure is centred in the frame (x 25..103 of
+  // 128) with feet at ~77%. Size ≈ the tile so the sprite barely overhangs the
+  // square; centred → feet land on the shadow (~80% of the tile).
+  const mummySize = Math.round(cell * 1.1);
+  const mummyNudgeY = 0;
 
   // Dark levels (SPEC §2.7): a torchlight overlay that follows the explorer.
   // View-only — the engine never sees this. Light is centred on the explorer's
@@ -602,6 +635,21 @@ export function Board({
     if (el) spriteEls.current.set(id, el);
     else spriteEls.current.delete(id);
   };
+  // The mummy's sheet background element (per monster), animated through its walk
+  // cycle during a hop. Separate from the outer .sprite (which owns the position).
+  const mummyEls = useRef(new Map<string, HTMLElement>());
+  const setMummyEl = (id: string) => (el: HTMLElement | null) => {
+    if (el) mummyEls.current.set(id, el);
+    else mummyEls.current.delete(id);
+  };
+  // Facing rule: while taking a step the mummy looks the way it WALKS (the step
+  // direction); once it has stopped it turns to face the PLAYER. So mid-hop =
+  // step direction (prev → cur), settled = toward the player.
+  const currentMummyFacing = (m: RenderState['monsters'][number]): Facing8 => {
+    const prev = prevPos.current.get(m.id);
+    const stepped = prev ? moveFacing(prev, m.pos) : null;
+    return stepped ?? mummyFacing(m.pos, render.player);
+  };
   useLayoutEffect(() => {
     const hop = (id: string, pos: Pos, dur: number) => {
       const el = spriteEls.current.get(id);
@@ -616,8 +664,33 @@ export function Board({
     };
     hop('player', render.player, PLAYER_ANIM_MS);
     hop('player-oval', render.player, PLAYER_ANIM_MS);
-    for (const m of render.monsters) if (m.alive) hop(m.id, m.pos, MONSTER_ANIM_MS);
-  }, [render, cell]);
+    for (const m of render.monsters) {
+      if (!m.alive) continue;
+      const prev = prevPos.current.get(m.id); // capture BEFORE hop() overwrites it
+      hop(m.id, m.pos, MONSTER_ANIM_MS);
+      // A mummy that actually stepped plays its walk cycle: cycle the sheet's
+      // walk-frame columns (steps) over the hop, in the row for its facing.
+      if (isMummyKind(m.kind) && prev && Math.abs(m.pos.x - prev.x) + Math.abs(m.pos.y - prev.y) === 1) {
+        const el = mummyEls.current.get(m.id);
+        const dir = moveFacing(prev, m.pos); // the mummy walks facing its step
+        if (el && dir && typeof el.animate === 'function') {
+          const y = -mummyWalkRow(dir) * mummySize;
+          const anim = el.animate(
+            [
+              { backgroundPosition: `0px ${y}px` },
+              { backgroundPosition: `${-MUMMY_WALK_FRAMES * mummySize}px ${y}px` },
+            ],
+            { duration: MONSTER_ANIM_MS, easing: `steps(${MUMMY_WALK_FRAMES})` },
+          );
+          // when the step finishes, turn to face the player (frame 0).
+          const faceRow = -mummyWalkRow(mummyFacing(m.pos, render.player)) * mummySize;
+          anim.onfinish = () => {
+            el.style.backgroundPosition = `0px ${faceRow}px`;
+          };
+        }
+      }
+    }
+  }, [render, cell, mummySize]);
 
   return (
     <div className="board" style={boardStyle}>
@@ -692,9 +765,23 @@ export function Board({
                 {lit ? (
                   <span className={`sprite__fx${fxClass}`}>
                     <span className="sprite__shadow" />
-                    <span className="sprite__body" style={facing}>
-                      <MonsterSprite kind={m.kind} size={charSize} />
-                    </span>
+                    {isMummyKind(m.kind) ? (
+                      <span
+                        className="sprite__body"
+                        style={{ transform: `translateY(${mummyNudgeY}px)` }}
+                      >
+                        <MummySheet
+                          ref={setMummyEl(m.id)}
+                          variant={mummyVariant(m.kind)}
+                          facing={currentMummyFacing(m)}
+                          size={mummySize}
+                        />
+                      </span>
+                    ) : (
+                      <span className="sprite__body" style={facing}>
+                        <MonsterSprite kind={m.kind} size={charSize} />
+                      </span>
+                    )}
                   </span>
                 ) : (
                   <span className="dark-eyes" style={facing}>

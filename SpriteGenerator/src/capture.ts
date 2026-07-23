@@ -78,6 +78,24 @@ function sharpen(ctx: CanvasRenderingContext2D, x: number, y: number, s: number,
  * configured) renderer. The renderer, camera and lights are shared across
  * variants so both sheets are pixel-identical in framing.
  */
+// ONE shared renderer for all bakes. Creating a WebGLRenderer per bake (the live
+// contact sheet re-bakes on every slider move) leaks GL contexts until the
+// browser kills the oldest — which blanked the export. Reuse a singleton and
+// never dispose it.
+let sharedRenderer: THREE.WebGLRenderer | null = null;
+function bakeRenderer(): THREE.WebGLRenderer {
+  if (sharedRenderer) return sharedRenderer;
+  const R = sceneParams.renderPx;
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  r.setPixelRatio(1);
+  r.setSize(R, R, false);
+  r.setClearColor(0x000000, 0);
+  r.outputColorSpace = THREE.SRGBColorSpace;
+  r.toneMapping = THREE.NoToneMapping;
+  sharedRenderer = r;
+  return r;
+}
+
 function bakeVariant(
   variant: Variant,
   renderer: THREE.WebGLRenderer,
@@ -100,11 +118,47 @@ function bakeVariant(
   sctx.imageSmoothingEnabled = true;
   sctx.imageSmoothingQuality = 'high';
 
+  // Scratch 2D canvas to read pixels back for the auto-centre measurement.
+  const meas = document.createElement('canvas');
+  meas.width = meas.height = R;
+  const mctx = meas.getContext('2d', { willReadFrequently: true })!;
+
+  // Feet land on this fraction of the frame, in EVERY facing (a fixed floor line).
+  const FEET_TARGET = 0.773;
+
   for (const clip of clips) {
     const def = CLIPS[clip.name as keyof typeof CLIPS];
     for (let fi = 0; fi < FACINGS.length; fi++) {
       const facing = FACINGS[fi];
       rig.root.rotation.y = FACING_ANGLE[facing];
+
+      // Per-facing offset: the model rotates around a pivot BEHIND the figure
+      // (arms thrust forward), so each facing drifts sideways/vertically in the
+      // frame. Measure frame 0's silhouette and shift ALL of this facing's frames
+      // so the figure is centred horizontally and its feet sit on FEET_TARGET.
+      applyPose(rig, clip.name as keyof typeof CLIPS, 0);
+      renderer.render(scene, camera);
+      mctx.clearRect(0, 0, R, R);
+      mctx.drawImage(renderer.domElement, 0, 0);
+      const px = mctx.getImageData(0, 0, R, R).data;
+      let minX = R;
+      let maxX = -1;
+      let maxY = -1;
+      for (let y = 0; y < R; y++) {
+        const rowo = y * R * 4;
+        for (let x = 0; x < R; x++) {
+          if (px[rowo + x * 4 + 3] > 16) {
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      const offX = maxX >= 0 ? R / 2 - (minX + maxX) / 2 : 0; // centre horizontally
+      const offY = maxX >= 0 ? FEET_TARGET * R - maxY : 0; // feet → fixed floor line
+      const dxF = (offX * F) / R;
+      const dyF = (offY * F) / R;
+
       for (let frame = 0; frame < def.frames; frame++) {
         const t = frame / def.frames;
         applyPose(rig, clip.name as keyof typeof CLIPS, t);
@@ -112,9 +166,9 @@ function bakeVariant(
 
         const cx = frame * F;
         const cy = (clip.row + fi) * F;
-        // downscale the 4× GL frame straight into the sheet cell
+        // downscale the 4× GL frame into the cell, shifted to the centred/anchored spot
         sctx.clearRect(cx, cy, F, F);
-        sctx.drawImage(renderer.domElement, 0, 0, R, R, cx, cy, F, F);
+        sctx.drawImage(renderer.domElement, 0, 0, R, R, cx + dxF, cy + dyF, F, F);
         sharpen(sctx, cx, cy, F, sceneParams.sharpen);
       }
     }
@@ -131,33 +185,18 @@ export interface BakeResult {
   meta: SheetMeta;
 }
 
-/** Bake both variants + metadata. Self-contained: owns its renderer. */
-export function bakeAll(): BakeResult {
-  const R = sceneParams.renderPx;
-  const renderer = new THREE.WebGLRenderer({
-    antialias: true,
-    alpha: true,
-    preserveDrawingBuffer: true,
-  });
-  renderer.setPixelRatio(1);
-  renderer.setSize(R, R, false);
-  renderer.setClearColor(0x000000, 0);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.NoToneMapping;
-
-  const camera = makeCamera();
-  const lights = makeLights();
-
-  const white = bakeVariant('white', renderer, camera, lights);
-  const red = bakeVariant('red', renderer, camera, lights);
-  const meta = buildMeta();
-
-  renderer.dispose();
-  renderer.forceContextLoss();
-  return { white, red, meta };
+/** Bake ONE variant's sheet (uses the shared renderer + current scene params). */
+export function bakeSheet(variant: Variant): HTMLCanvasElement {
+  return bakeVariant(variant, bakeRenderer(), makeCamera(), makeLights());
 }
 
-/** Trigger browser downloads of the two PNGs + JSON. */
+/** Bake both variants + metadata. */
+export function bakeAll(): BakeResult {
+  return { white: bakeSheet('white'), red: bakeSheet('red'), meta: buildMeta() };
+}
+
+/** Trigger browser downloads of the two PNGs + JSON, staggered (Safari blocks
+ *  rapid successive programmatic downloads, so space them out). */
 export function downloadBake(result: BakeResult) {
   const save = (name: string, url: string) => {
     const a = document.createElement('a');
@@ -167,8 +206,13 @@ export function downloadBake(result: BakeResult) {
     a.click();
     a.remove();
   };
-  save('mummy_white.png', result.white.toDataURL('image/png'));
-  save('mummy_red.png', result.red.toDataURL('image/png'));
-  const metaBlob = new Blob([JSON.stringify(result.meta, null, 2)], { type: 'application/json' });
-  save('mummy.meta.json', URL.createObjectURL(metaBlob));
+  const metaUrl = URL.createObjectURL(
+    new Blob([JSON.stringify(result.meta, null, 2)], { type: 'application/json' }),
+  );
+  const items: Array<[string, string]> = [
+    ['mummy_white.png', result.white.toDataURL('image/png')],
+    ['mummy_red.png', result.red.toDataURL('image/png')],
+    ['mummy.meta.json', metaUrl],
+  ];
+  items.forEach(([name, url], i) => setTimeout(() => save(name, url), i * 350));
 }

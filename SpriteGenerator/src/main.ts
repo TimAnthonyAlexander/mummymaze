@@ -5,7 +5,7 @@ import { applyPose } from './pose';
 import { CLIPS, CLIP_ORDER, type ClipName } from './clips';
 import { FACINGS, FACING_ANGLE, sceneParams, type Facing } from './sceneParams';
 import { makeCamera, makeLights, updateCamera, updateLights } from './stage';
-import { bakeAll, downloadBake, type BakeResult } from './capture';
+import { bakeAll, bakeSheet, downloadBake, type BakeResult } from './capture';
 import type { Variant } from './textures';
 
 // ── shared scene (one mummy, viewed by the fixed cam and the debug orbit cam) ──
@@ -90,8 +90,7 @@ function scheduleSheet() {
 }
 function rebuildSheet() {
   // bake ONLY the current variant for the live sheet (cheap enough)
-  const result = bakeAll();
-  const cv = variant === 'white' ? result.white : result.red;
+  const cv = bakeSheet(variant);
   sheetCanvas.width = cv.width;
   sheetCanvas.height = cv.height;
   const ctx = sheetCanvas.getContext('2d')!;

@@ -1,0 +1,41 @@
+{
+  "frameW": 128,
+  "frameH": 128,
+  "columns": 16,
+  "rows": 24,
+  "variants": [
+    "white",
+    "red"
+  ],
+  "facings": [
+    "N",
+    "NE",
+    "E",
+    "SE",
+    "S",
+    "SW",
+    "W",
+    "NW"
+  ],
+  "clips": [
+    {
+      "name": "idle",
+      "frames": 1,
+      "fps": 1,
+      "row": 0
+    },
+    {
+      "name": "walk",
+      "frames": 8,
+      "fps": 10,
+      "row": 8
+    },
+    {
+      "name": "headturn",
+      "frames": 16,
+      "fps": 22,
+      "row": 16
+    }
+  ],
+  "note": "Each clip occupies a block of 8 rows (one per facing, in `facings` order); columns are animation frames. Fixed game-view camera; transparent background."
+}

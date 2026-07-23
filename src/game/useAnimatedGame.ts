@@ -125,12 +125,24 @@ function applyCrash(r: RenderState, loserId: string, tile: Pos | null): RenderSt
   return { ...r, monsters, puffs };
 }
 
+/**
+ * A mummy's heavy tread: THREE quick footfalls per step (BAM-BAM-BAM), so its
+ * double move reads as two triples (six thumps). Scorpions keep a single thump.
+ */
+const STOMP_GAP_MS = 90;
+function monsterStomp(): void {
+  sfx.monster();
+  window.setTimeout(() => sfx.monster(), STOMP_GAP_MS);
+  window.setTimeout(() => sfx.monster(), STOMP_GAP_MS * 2);
+}
+
 /** Mutations + sounds gathered for one simultaneity tick. */
 interface Round {
   applies: ((r: RenderState) => RenderState)[];
   sounds: (() => void)[];
   hasKill: boolean;
-  monsterSounded: boolean; // one footstep thump per step-tick (see buildFrames)
+  // footfall for this tick: 0 = none, 1 = single (scorpion), 3 = mummy triple.
+  monsterStomps: 0 | 1 | 3;
 }
 
 /** Add a crash burst (smoke + sparkles) at a tile to the render's puff list. */
@@ -140,8 +152,9 @@ function addPuff(r: RenderState, id: string, pos: Pos): RenderState {
 
 function buildFrames(
   trace: readonly TraceEvent[],
-  opts: { playerCrashTile?: Pos | null } = {},
+  opts: { playerCrashTile?: Pos | null; mummyIds?: ReadonlySet<string> } = {},
 ): Frame[] {
+  const mummyIds = opts.mummyIds ?? new Set<string>();
   // Batch the turn into rounds keyed by TraceMove.round so every monster steps
   // at the same tick (mummies twice, scorpions once) instead of one-after-
   // another. Gate/kill events attach to the round of the move that caused them.
@@ -155,7 +168,7 @@ function buildFrames(
   const bucket = (round: number): Round => {
     let b = rounds.get(round);
     if (!b) {
-      b = { applies: [], sounds: [], hasKill: false, monsterSounded: false };
+      b = { applies: [], sounds: [], hasKill: false, monsterStomps: 0 };
       rounds.set(round, b);
     }
     return b;
@@ -171,12 +184,13 @@ function buildFrames(
         b.applies.push((r) => setActorPos(r, actor, to));
         if (actor === 'player') {
           b.sounds.push(sfx.step);
-        } else if (!b.monsterSounded) {
-          // One footstep thump per step-TICK (round), not one per turn: all
-          // monsters stepping together this tick share the footfall, so a mummy's
-          // two steps land as two distinct footsteps (round 1, then round 2).
-          b.monsterSounded = true;
-          b.sounds.push(sfx.monster);
+        } else {
+          // One footfall per step-TICK (round), shared by all monsters stepping
+          // together this tick. A mummy makes it a heavy TRIPLE; a scorpion a
+          // single. Highest wins per tick, so a mummy's two steps land as two
+          // triples (round 1, then round 2) = six thumps.
+          if (mummyIds.has(actor)) b.monsterStomps = 3;
+          else if (b.monsterStomps === 0) b.monsterStomps = 1;
         }
         break;
       }
@@ -204,13 +218,15 @@ function buildFrames(
 
   const frames: Frame[] = [];
   for (const round of [...rounds.keys()].sort((a, b) => a - b)) {
-    const { applies, sounds, hasKill } = rounds.get(round)!;
+    const { applies, sounds, hasKill, monsterStomps } = rounds.get(round)!;
     // Round 0 is the player's hop; rounds >= 1 are the slower monster step-ticks.
     const base = round === 0 ? PLAYER_HOP_MS : MONSTER_HOP_MS;
+    const footfall = monsterStomps === 3 ? monsterStomp : monsterStomps === 1 ? sfx.monster : null;
+    const roundSounds = footfall ? [...sounds, footfall] : sounds;
     frames.push({
       dur: hasKill ? base + KILL_MS : base,
       apply: (r) => applies.reduce((acc, fn) => fn(acc), r),
-      sound: sounds.length ? () => sounds.forEach((s) => s()) : undefined,
+      sound: roundSounds.length ? () => roundSounds.forEach((s) => s()) : undefined,
     });
   }
   for (const ex of exits) {
@@ -474,7 +490,11 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
         next.phase === 'lost' &&
         (next.lossReason === 'caught' || next.lossReason === 'walked-into-monster');
       const playerCrashTile = caughtLoss ? next.player : null;
-      play(buildFrames(trace, { playerCrashTile }), startRender, finalRender, settle);
+      // mummies (from the pre-move state) get the heavy triple footfall.
+      const mummyIds = new Set(
+        present.monsters.filter((m) => m.kind.startsWith('mummy')).map((m) => m.id),
+      );
+      play(buildFrames(trace, { playerCrashTile, mummyIds }), startRender, finalRender, settle);
     },
     [play, snap, finishSpawn],
   );
