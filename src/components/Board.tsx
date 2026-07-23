@@ -151,6 +151,12 @@ function computeWallSegments(level: Level): WallSeg[] {
  * face's corners to the base's corners (a single big offset would read as two
  * detached rectangles). A final blurred layer casts onto the floor below-right.
  * Light source is top-left, so the extrusion runs down-right.
+ *
+ * NOTE: do NOT replace the final blurred layer with a big hard-offset rect. A
+ * box-shadow offset far from the element paints a DETACHED copy of the slab's
+ * top face, which reads as the wall hovering above the floor. A cast shadow in
+ * this projection has to stay connected to the block's base corner-to-corner —
+ * which is what the stepped stack above already does.
  */
 function extrudeShadow(liftPx: number, sideColor: string): string {
   const layers: string[] = [];
@@ -249,7 +255,7 @@ const BoardFloor = memo(function BoardFloor({
   );
 });
 
-/** Static overlay: baked AO vignette, grain film, and the exit opening. */
+/** Static overlay: floor cracks, the vignette, the grain film and the exit. */
 const BoardStaticOverlay = memo(function BoardStaticOverlay({
   level,
   cell,
@@ -261,6 +267,7 @@ const BoardStaticOverlay = memo(function BoardStaticOverlay({
   const h = cell * level.height;
   return (
     <>
+      <div className="board__cracks" style={{ width: w, height: h }} aria-hidden="true" />
       <div className="board__ao" style={{ width: w, height: h }} aria-hidden="true" />
       <div className="board__grain" style={{ width: w, height: h }} aria-hidden="true" />
       {/* On dark levels the exit is drawn ABOVE the dark overlay instead (see the
@@ -582,6 +589,7 @@ export function Board({
     '--tex-floor-b': boardTextures.floorB,
     '--tex-wall-top': boardTextures.wallTop,
     '--tex-grain': boardTextures.grain,
+    '--tex-cracks': boardTextures.cracks,
   } as CSSProperties;
 
   const markerSize = Math.round(cell * 0.66);

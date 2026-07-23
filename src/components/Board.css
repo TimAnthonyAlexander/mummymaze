@@ -5,8 +5,12 @@
      wallTop texture base; the side face is a deep shadowed brown. */
   --wall-top: #c2a877; /* lit top face (light from top-left) */
   --wall-side: #5a4530; /* front/side face in shadow */
-  --floor-a: #ccb082;
-  --floor-b: #9d7c4b;
+  /* Fallback colours BEHIND the floor textures. They must stay in sync with the
+     texture base colours in game/textures.ts — the spawn-intro rising slab
+     (.spawn-riser__block--a/--b) uses these same vars and has to be
+     pixel-identical to a settled .cell or it flashes on hand-off. */
+  --floor-a: #c8b189;
+  --floor-b: #8f7a55;
   --grid-line: rgba(46, 32, 14, 0.28); /* mortar between tiles */
   --wall-lift: 6px;
   --sprite-lift: 5px;
@@ -108,7 +112,8 @@
    drawn with stacked box-shadows (expensive to repaint); caching them as a GPU
    texture means a sprite animating OVER them never triggers their repaint — the
    fix for the whole-board 3 FPS stutter while anything moves. z-index 2 keeps
-   the plane above the AO (1) and below the grain (3)/exit (4)/sprites. */
+   the plane above the floor cracks (1) and below the vignette/grain (3), the
+   exit (4) and the sprites. */
 .board__walls {
   position: absolute;
   top: 0;
@@ -117,20 +122,45 @@
   transform: translateZ(0);
 }
 
-/* Baked AO + a soft grain film, both sized to the grid and set in Board.tsx.
-   The vignette sits just above the floor (below walls); the grain sits above the
-   walls (below sprites) so floor and stone share one layer of compression fuzz. */
-.board__ao {
+/* Board-scale fractures across the floor slab. Tiled MUCH larger than a cell so
+   the cracks run across tile boundaries and read as damage to one stone floor,
+   not per-tile decoration. Sits at z1 — over the floor, UNDER the walls, so the
+   stone blocks are not cracked, only the ground. */
+.board__cracks {
   position: absolute;
   top: 0;
   left: 0;
   pointer-events: none;
   z-index: 1;
+  background-image: var(--tex-cracks);
+  background-repeat: repeat;
+  background-size: calc(var(--cell) * 7.5);
+  opacity: 0.45;
+}
+
+/* The vignette. A real enclosure cue: it multiplies over the WHOLE board — floor
+   AND walls — so the maze darkens into its surrounding stone at the edges rather
+   than only the ground doing so. z-index 3 puts it above the walls (2) and below
+   the exit (4), the dark-level torch overlay (5) and the sprites (6/7). `.board`
+   sets `isolation: isolate`, so the multiply is contained to the board and never
+   darkens the page behind it. Static layer — never re-renders on a sprite hop. */
+.board__ao {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 3;
+  mix-blend-mode: multiply;
+  /* Multiply factors: white = untouched centre, ~0.63 at the corners (a ~37%
+     brightness drop), warm-biased (blue falls furthest) so the edges go shadowed
+     sandstone rather than grey. */
   background: radial-gradient(
-    120% 120% at 50% 42%,
-    rgba(0, 0, 0, 0) 55%,
-    rgba(26, 16, 5, 0.28) 82%,
-    rgba(20, 12, 3, 0.5) 100%
+    58% 58% at 50% 46%,
+    #ffffff 0%,
+    #f8f4ed 35%,
+    #ddd2bc 62%,
+    #b9a98d 82%,
+    #9a8a6c 100%
   );
 }
 .board__grain {
