@@ -218,6 +218,9 @@ interface PlayOpts {
   readonly gain?: number;
   /** Slight random pitch shift so repeated footsteps/shuffles vary. */
   readonly vary?: boolean;
+  /** Base playback rate (1 = unpitched). <1 = lower/heavier (e.g. a big mummy's
+   *  footfall vs the player's). `vary` jitters around this base. */
+  readonly rate?: number;
 }
 
 /** Play one of `urls` (random pick) through a gain node. Silent if not decoded. */
@@ -233,7 +236,9 @@ function playSample(urls: readonly string[], opts: PlayOpts = {}): void {
   try {
     const src = c.createBufferSource();
     src.buffer = buf;
-    if (opts.vary) src.playbackRate.value = 0.93 + Math.random() * 0.14;
+    const base = opts.rate ?? 1;
+    if (opts.vary) src.playbackRate.value = base * (0.95 + Math.random() * 0.1);
+    else if (opts.rate) src.playbackRate.value = base;
     const g = c.createGain();
     g.gain.value = opts.gain ?? 0.5;
     src.connect(g).connect(c.destination);
@@ -257,8 +262,11 @@ export const sfx = {
   step: () => play(() => playSample(SAMPLES.step, { gain: 0.5, vary: true })),
   /** A blocked move / wait: a soft muffled bump. */
   blockedWait: () => play(() => playSample(SAMPLES.blockedWait, { gain: 0.4 })),
-  /** Monster sub-step: a dry cloth/bandage shuffle (throttled by the caller). */
-  monster: () => play(() => playSample(SAMPLES.monster, { gain: 0.4, vary: true })),
+  /** Monster sub-step: a heavy footstep. Reuses the stone-footstep clips pitched
+   *  DOWN (rate 0.78) so a mummy's footfall reads as a real, weighty step —
+   *  distinct from the player's lighter step. One per step-tick (see buildFrames),
+   *  so a mummy's two steps are two footfalls. */
+  monster: () => play(() => playSample(SAMPLES.step, { gain: 0.5, vary: true, rate: 0.78 })),
   /** Key pickup / gate toggle: a metal latch. */
   key: () => play(() => playSample(SAMPLES.key, { gain: 0.6 })),
   /** Monster collision: a heavy soft thud. */

@@ -314,21 +314,45 @@
   z-index: 6;
 }
 
-/* A flat yellow oval ALWAYS on the floor under the explorer's feet (aligned to
-   the pooled ground shadow at ~80% down the tile — the feet are NOT at tile
-   centre). Flat baked fill, no gradient; squashed to an oval by the faux top-down
-   perspective. Below the sprite; a permanent locator so the player is findable. */
+/* Wait-on-your-tile affordance (opt-in — only rendered when the move-arrows
+   setting is on, Board.tsx). Two planes.
+
+   1) The transparent HIT TARGET. Must sit ABOVE the board-annotations SVG
+      (z-index 8, pointer-events:auto, covers the whole board) or it never
+      receives hover/clicks — same reason .move-arrow is z-index 9. Carries no
+      visual, so it can be above the sprite without covering it. */
 .player-oval {
+  position: absolute;
+  width: var(--cell);
+  height: var(--cell);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 9;
+}
+.player-oval:focus-visible {
+  outline: 2px solid var(--focus-ring, #6fb1ff);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* 2) The VISUAL locator oval, on its own plane BELOW the sprite (z-index 0) so it
+      rings the feet and never covers the explorer. Aligned to the pooled ground
+      shadow at ~80% down the tile (the feet are NOT at tile centre). Flat baked
+      fill, no gradient; squashed to an oval by the faux top-down perspective.
+      Revealed ONLY while the hit target above is hovered/focused (:has), so it
+      reads as a clickable "wait here", not a permanent visual crutch. */
+.player-oval-ring {
   position: absolute;
   width: var(--cell);
   height: var(--cell);
   pointer-events: none;
   z-index: 0;
 }
-.player-oval::before {
+.player-oval-ring::before {
   content: '';
   position: absolute;
-  /* Centre on the pooled ground shadow (~80% down the tile) so it rings the feet. */
   left: 50%;
   top: 80%;
   width: 64%;
@@ -339,6 +363,12 @@
   box-shadow:
     inset 0 0 0 2px rgba(120, 82, 14, 0.85),
     0 0 0 1px rgba(30, 18, 2, 0.5);
+  opacity: 0;
+  transition: opacity 90ms ease;
+}
+.board__overlay:has(.player-oval:hover) .player-oval-ring::before,
+.board__overlay:has(.player-oval:focus-visible) .player-oval-ring::before {
+  opacity: 1;
 }
 
 /* Click-to-move arrows (opt-in). One chunky arrow per reachable tile. Must sit
@@ -358,6 +388,17 @@
   z-index: 9;
   /* No drop shadow — the thin brown outline is the whole edge. */
   transition: transform 90ms ease;
+}
+/* The arrow graphic is hidden until you hover (or keyboard-focus) its own tile —
+   so the darts are a per-tile affordance you summon, not a permanent overlay.
+   The button itself stays a full-tile transparent hit target either way. */
+.move-arrow svg {
+  opacity: 0;
+  transition: opacity 90ms ease;
+}
+.move-arrow:hover svg,
+.move-arrow:focus-visible svg {
+  opacity: 1;
 }
 .move-arrow:hover {
   transform: scale(1.12);

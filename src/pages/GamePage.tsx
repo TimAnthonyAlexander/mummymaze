@@ -76,6 +76,17 @@ export function GamePage() {
     recordedWinRef.current = null;
   }, [level.id]);
 
+  // On a win, auto-advance to the next level as soon as the exit-walk animation
+  // has settled — no end-of-level overlay. The `state.level.id === level.id`
+  // guard stops a second navigation firing before the new level has loaded; the
+  // final level (no next) falls through to the overlay in BoardPane instead.
+  useEffect(() => {
+    if (state.phase !== 'won' || animating) return;
+    if (state.level.id !== level.id) return;
+    const nxt = nextInProgression(level.id);
+    if (nxt) navigate('/play', { state: { levelId: nxt } });
+  }, [state.phase, animating, state.level.id, level.id, navigate]);
+
   // Live "Enter" handler for the end-of-level screen, kept in a ref so the
   // key listener (subscribed once) always sees the current phase/level/next.
   // On WIN, Enter advances to the next level; on LOSE, Enter restarts (accepts

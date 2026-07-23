@@ -1,5 +1,6 @@
 import { type CSSProperties, Fragment, memo, useLayoutEffect, useRef } from 'react';
 import {
+  type Action,
   type Dir,
   type Level,
   type Pos,
@@ -25,8 +26,18 @@ function spriteStyle(pos: Pos, cell: number): CSSProperties {
 /** Fixed radial angles (deg) for the sparkles flung from a crash impact. */
 const CRASH_SPARK_ANGLES = [8, 62, 128, 182, 246, 312];
 
-/** Per-hop compositor animation duration (Web Animations API), ~ the hop cadence. */
-const HOP_ANIM_MS = 130;
+/** Per-hop compositor animation durations (Web Animations API). Each is kept just
+ *  a HAIR under its matching timeline hold (PLAYER_HOP_MS / MONSTER_HOP_MS in
+ *  useAnimatedGame) so a hop finishes and rests a few ms before the next round —
+ *  the "super short pause" between a mummy's two steps, not a hard stop. Monsters
+ *  hop about 2× slower than the player so their pursuit reads as a deliberate
+ *  walk (the player's own move stays snappy/responsive). */
+const PLAYER_ANIM_MS = 290;
+const MONSTER_ANIM_MS = 580;
+/** Gentle, near-linear ease: each single step is a slow even glide that only eases
+ *  slightly at its ends, so it reads as a deliberate WALK to each tile with a faint
+ *  slowdown between a mummy's two steps — not a fast lunge-then-freeze. */
+const HOP_EASING = 'cubic-bezier(0.4, 0.2, 0.6, 0.8)';
 
 /**
  * The translate() for a sprite standing in `pos`. Nudged slightly UP-LEFT within
@@ -519,8 +530,8 @@ interface BoardProps {
   moveArrows?: boolean;
   /** True only when it's the player's turn and no animation is playing. */
   interactive?: boolean;
-  /** Dispatch a move when an arrow is clicked. */
-  onMove?: (dir: Dir) => void;
+  /** Dispatch an action when an arrow (or the wait-on-your-tile oval) is used. */
+  onMove?: (action: Action) => void;
 }
 
 export function Board({
@@ -592,7 +603,7 @@ export function Board({
     else spriteEls.current.delete(id);
   };
   useLayoutEffect(() => {
-    const hop = (id: string, pos: Pos) => {
+    const hop = (id: string, pos: Pos, dur: number) => {
       const el = spriteEls.current.get(id);
       const prev = prevPos.current.get(id);
       prevPos.current.set(id, pos);
@@ -600,12 +611,12 @@ export function Board({
       if (Math.abs(pos.x - prev.x) + Math.abs(pos.y - prev.y) !== 1) return; // snap, don't animate
       el.animate(
         [{ transform: charTranslate(prev, cell) }, { transform: charTranslate(pos, cell) }],
-        { duration: HOP_ANIM_MS, easing: 'linear' },
+        { duration: dur, easing: HOP_EASING },
       );
     };
-    hop('player', render.player);
-    hop('player-oval', render.player);
-    for (const m of render.monsters) if (m.alive) hop(m.id, m.pos);
+    hop('player', render.player, PLAYER_ANIM_MS);
+    hop('player-oval', render.player, PLAYER_ANIM_MS);
+    for (const m of render.monsters) if (m.alive) hop(m.id, m.pos, MONSTER_ANIM_MS);
   }, [render, cell]);
 
   return (
@@ -695,15 +706,31 @@ export function Board({
             );
           })}
 
-        {/* A flat yellow oval always sits on the floor under the explorer so it's
-            instantly findable. Perspective (top-down-ish board) reads the circle
-            as an oval. Below the sprite; tracks the feet via charStyle. */}
-        <div
-          ref={setSpriteEl('player-oval')}
-          className="player-oval"
-          style={charStyle(render.player, cell)}
-          aria-hidden="true"
-        />
+        {/* Wait-on-your-tile affordance — only when the move-arrows setting is on
+            (same opt-in as the click-to-move darts) and it's an interactive turn.
+            TWO planes: the gold locator oval sits BELOW the sprite (rings the feet,
+            never covers the explorer); the transparent hit target sits ABOVE the
+            annotations SVG so it actually receives hover/click. The oval is
+            revealed only while the hit target is hovered/focused (CSS :has), and
+            clicking waits one turn (same as Space). Both track the feet via
+            charStyle. */}
+        {moveArrows && interactive && onMove && (
+          <>
+            <div
+              className="player-oval-ring"
+              style={charStyle(render.player, cell)}
+              aria-hidden="true"
+            />
+            <button
+              type="button"
+              ref={setSpriteEl('player-oval')}
+              className="player-oval"
+              style={charStyle(render.player, cell)}
+              aria-label="Wait one turn"
+              onClick={() => onMove('wait')}
+            />
+          </>
+        )}
 
         {/* Explorer — faces its last move direction. */}
         <div

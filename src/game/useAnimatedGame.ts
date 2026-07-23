@@ -32,7 +32,14 @@ import { type RenderState, toRender } from './render';
 import { sfx } from './sound';
 import { loadSave } from './storage';
 
-const HOP_MS = 135; // per single-tile hop
+// Per single-tile hop timeline holds. Each turn plays round-by-round: round 0 is
+// the player's hop, rounds >=1 are the monsters' step-ticks (a mummy steps twice
+// => rounds 1 and 2). Monsters are ~2× slower than the player so their pursuit is
+// a deliberate walk while the player's own move stays snappy. Each slightly
+// exceeds the board's matching *_ANIM_MS so a hop settles and rests before the
+// next round — the short pause between a mummy's two steps.
+const PLAYER_HOP_MS = 300; // player hop (round 0) + generic player-only frames
+const MONSTER_HOP_MS = 600; // monster step-tick (round >= 1)
 const KILL_MS = 110; // pause when a monster is destroyed
 const CRASH_HOLD_MS = 360; // hold after a crash so the smoke + sparkles finish before settle
 const INITIAL_MS = 24; // let the pre-move frame paint before the first hop
@@ -123,6 +130,7 @@ interface Round {
   applies: ((r: RenderState) => RenderState)[];
   sounds: (() => void)[];
   hasKill: boolean;
+  monsterSounded: boolean; // one footstep thump per step-tick (see buildFrames)
 }
 
 /** Add a crash burst (smoke + sparkles) at a tile to the render's puff list. */
@@ -143,12 +151,11 @@ function buildFrames(
   const exits: { path: readonly RenderState['player'][] }[] = [];
   let lastRound = 0;
   let lastMoveTo: Pos | null = null; // most recent hop's destination (the crash tile)
-  let monsterSounded = false; // one monster thump per turn
 
   const bucket = (round: number): Round => {
     let b = rounds.get(round);
     if (!b) {
-      b = { applies: [], sounds: [], hasKill: false };
+      b = { applies: [], sounds: [], hasKill: false, monsterSounded: false };
       rounds.set(round, b);
     }
     return b;
@@ -164,8 +171,11 @@ function buildFrames(
         b.applies.push((r) => setActorPos(r, actor, to));
         if (actor === 'player') {
           b.sounds.push(sfx.step);
-        } else if (!monsterSounded) {
-          monsterSounded = true;
+        } else if (!b.monsterSounded) {
+          // One footstep thump per step-TICK (round), not one per turn: all
+          // monsters stepping together this tick share the footfall, so a mummy's
+          // two steps land as two distinct footsteps (round 1, then round 2).
+          b.monsterSounded = true;
           b.sounds.push(sfx.monster);
         }
         break;
@@ -195,15 +205,17 @@ function buildFrames(
   const frames: Frame[] = [];
   for (const round of [...rounds.keys()].sort((a, b) => a - b)) {
     const { applies, sounds, hasKill } = rounds.get(round)!;
+    // Round 0 is the player's hop; rounds >= 1 are the slower monster step-ticks.
+    const base = round === 0 ? PLAYER_HOP_MS : MONSTER_HOP_MS;
     frames.push({
-      dur: hasKill ? HOP_MS + KILL_MS : HOP_MS,
+      dur: hasKill ? base + KILL_MS : base,
       apply: (r) => applies.reduce((acc, fn) => fn(acc), r),
       sound: sounds.length ? () => sounds.forEach((s) => s()) : undefined,
     });
   }
   for (const ex of exits) {
-    for (const p of ex.path) frames.push({ dur: HOP_MS, apply: (r) => ({ ...r, player: p }) });
-    frames.push({ dur: HOP_MS, apply: (r) => ({ ...r, playerOpacity: 0 }) });
+    for (const p of ex.path) frames.push({ dur: PLAYER_HOP_MS, apply: (r) => ({ ...r, player: p }) });
+    frames.push({ dur: PLAYER_HOP_MS, apply: (r) => ({ ...r, playerOpacity: 0 }) });
   }
 
   const hadKill = [...rounds.values()].some((b) => b.hasKill);
@@ -211,7 +223,7 @@ function buildFrames(
   if (opts.playerCrashTile) {
     const tile = opts.playerCrashTile;
     frames.push({
-      dur: HOP_MS,
+      dur: PLAYER_HOP_MS,
       apply: (r) => addPuff(r, `puff-player-${tile.x}-${tile.y}`, tile),
       sound: sfx.merge,
     });

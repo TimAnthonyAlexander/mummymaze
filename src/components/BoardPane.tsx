@@ -76,6 +76,9 @@ export function BoardPane({
   // (e.g. after the explorer has actually walked out through the exit).
   const done = state.phase !== 'player' && !animating;
   const won = state.phase === 'won';
+  // A win with a next level auto-advances in GamePage — show NO overlay. Only a
+  // loss, or a win on the final level (nothing to advance to), still gets one.
+  const showOverlay = done && (!won || !hasNext);
 
   return (
     <Box
@@ -103,7 +106,7 @@ export function BoardPane({
               onMove={onMove}
             />
           </BoardFrame>
-          {done && (
+          {showOverlay && (
             <Box
               sx={{
                 position: 'absolute',
