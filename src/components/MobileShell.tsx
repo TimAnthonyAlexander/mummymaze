@@ -146,7 +146,10 @@ export function MobileShell({
           onUndo={onUndo}
           onRestart={onRestart}
           canUndo={canUndo}
-          disabled={animating || state.phase !== 'player'}
+          // Stays live DURING a turn's animation: a press fast-forwards the
+          // in-flight turn and plays the next move (see useAnimatedGame.move), so
+          // a clear path can be walked quickly. Only a won/lost game locks it.
+          disabled={state.phase !== 'player'}
           hintDir={hintDir}
           hintUsed={hintUsed}
           solution={solution}

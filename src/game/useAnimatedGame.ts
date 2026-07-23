@@ -34,12 +34,13 @@ import { loadSave } from './storage';
 
 // Per single-tile hop timeline holds. Each turn plays round-by-round: round 0 is
 // the player's hop, rounds >=1 are the monsters' step-ticks (a mummy steps twice
-// => rounds 1 and 2). Monsters are ~2× slower than the player so their pursuit is
-// a deliberate walk while the player's own move stays snappy. Each slightly
-// exceeds the board's matching *_ANIM_MS so a hop settles and rests before the
-// next round — the short pause between a mummy's two steps.
+// => rounds 1 and 2). Monsters step a bit slower than the player so their pursuit
+// reads as a deliberate walk while the player's own move stays snappy — but not so
+// slow that a mummy's two hops feel sluggish. Each slightly exceeds the board's
+// matching *_ANIM_MS so a hop settles and rests before the next round — the short
+// pause between a mummy's two steps.
 const PLAYER_HOP_MS = 380; // player hop (round 0); spans the DAM-DUMDUM step triple
-const MONSTER_HOP_MS = 600; // monster step-tick (round >= 1)
+const MONSTER_HOP_MS = 500; // monster step-tick (round >= 1)
 const KILL_MS = 110; // pause when a monster is destroyed
 const CRASH_HOLD_MS = 360; // hold after a crash so the smoke + sparkles finish before settle
 const INITIAL_MS = 24; // let the pre-move frame paint before the first hop
@@ -343,6 +344,12 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
 
   const historyRef = useRef(history);
   historyRef.current = history;
+  // The committed present, kept in sync SYNCHRONOUSLY (not just on the next
+  // render). A mid-turn key-repeat can call move() twice before React re-renders;
+  // fast-forward must read the just-committed state, not the pre-turn one, or the
+  // first move would be lost.
+  const presentRef = useRef(history.present);
+  presentRef.current = history.present;
   const animatingRef = useRef(false);
   const spawningRef = useRef(false); // true only while the spawn-in intro plays
   const timerRef = useRef<number | null>(null);
@@ -475,11 +482,21 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
   const move = useCallback(
     (action: Action) => {
       if (spawningRef.current) finishSpawn(); // any input skips the spawn intro
-      if (animatingRef.current) return; // input locked during a turn's animation
-      const present = historyRef.current.present;
+      const present = presentRef.current;
       if (present.phase !== 'player') return;
+      if (animatingRef.current) {
+        // A press mid-turn FAST-FORWARDS: drop the in-flight turn's remaining hops
+        // and settle its monsters at their final positions, then play the new move
+        // from there. This lets a clear path be walked quickly without waiting out
+        // every monster step. The committed present is already this turn's result,
+        // so we replay from it. (If that turn had ended the game, present.phase
+        // wouldn't be 'player' and we'd have bailed above — so the death/win
+        // animation always finishes on its own.)
+        cancel();
+      }
       const { state: next, trace } = stepWithTrace(present, action);
       if (next === present) return; // nothing happened (should not occur in player phase)
+      presentRef.current = next;
       dispatch({ type: 'commit', next });
       // The explorer turns to face any directional input, even a blocked bump.
       if (action !== 'wait') playerFacingRef.current = action as Dir;
@@ -534,7 +551,7 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
       const frames = trapFall ? [...turnFrames, ...trapFallFrames(next.player)] : turnFrames;
       play(frames, startRender, finalRender, settleAll);
     },
-    [play, snap, finishSpawn],
+    [play, snap, finishSpawn, cancel],
   );
 
   const undo = useCallback(() => {
