@@ -1,13 +1,17 @@
 # Audio credits
 
-Every sound is **copyright-free** (no attribution legally required). All clips
-were transcoded to mono MP3.
+All clips were transcoded to mono MP3.
+
+Most bundled effects are copyright-free: Kenney (CC0 / public domain) plus one
+Mixkit Free-License clip. One clip — `rumble.mp3` — is **user-supplied for
+personal, offline play and its licence is NOT verified**; swap it for a CC0
+stone-drag before any public distribution.
 
 ## Kenney — CC0 (public domain)
 
-Most effects are **CC0** by **Kenney** — <https://kenney.nl>. No attribution is
-required; this credit is voluntary. Source packs: *RPG Audio*, *Impact Sounds*,
-*Interface Sounds* (<https://kenney.nl/assets>).
+**CC0** by **Kenney** — <https://kenney.nl>. No attribution is required; this
+credit is voluntary. Source packs: *RPG Audio*, *Impact Sounds*, *Interface
+Sounds* (<https://kenney.nl/assets>).
 License: Creative Commons Zero (CC0 1.0) —
 <https://creativecommons.org/publicdomain/zero/1.0/>
 
@@ -32,8 +36,12 @@ Mixkit Free License — royalty-free, no attribution required, commercial use OK
 no payment: <https://mixkit.co/license/#sfxFree>. Trimmed to ~1.5s, loudness-
 normalized, short fade-out.
 
-## Synthesized (not a file)
+## User-supplied — licence UNVERIFIED
 
-- **rumble** — a low, filtered stone-grind synthesized live in the Web Audio
-  graph (`sound.ts`) as the enemy tiles rise out of the floor. Nothing to
-  license; best-effort and silent without an audio context.
+| File | Event | Source |
+|------|-------|--------|
+| `rumble.mp3` | spawn rise (the stone-drag as tiles rise) | First 1.8s of a "dragging stone" effect ("touch of sound"), supplied by the user |
+
+Provenance is not confirmed CC0/copyright-free (the source filename suggests a
+downloaded clip). Included at the user's request for personal use only. Trimmed
+to 1.8s, mono, short fade-out. Replace with a CC0 stone-drag before distributing.

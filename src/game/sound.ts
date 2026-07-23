@@ -21,6 +21,7 @@ import mergeUrl from '../assets/audio/merge.mp3';
 import monster1 from '../assets/audio/monster1.mp3';
 import monster2 from '../assets/audio/monster2.mp3';
 import monster3 from '../assets/audio/monster3.mp3';
+import rumbleUrl from '../assets/audio/rumble.mp3';
 import scareUrl from '../assets/audio/scare.mp3';
 import step1 from '../assets/audio/step1.mp3';
 import step2 from '../assets/audio/step2.mp3';
@@ -173,6 +174,7 @@ const SAMPLES = {
   win: [winUrl],
   lose: [loseUrl],
   hint: [hintUrl],
+  rumble: [rumbleUrl],
   scare: [scareUrl],
 } as const;
 
@@ -247,48 +249,6 @@ function play(fn: () => void): void {
   fn();
 }
 
-// --- synthesized voice (spawn intro rise) -----------------------------------
-// The elevator rumble is a low bed under the tiles grinding up out of the floor.
-// Synthesized on the shared context (nothing to fetch), best-effort: a missing
-// or failed context degrades to silence and never throws. The scare that fires
-// on the head-turn is a recorded sample (SAMPLES.scare), not synthesized.
-
-/** Fill a mono AudioBuffer with white noise. */
-function noiseBuffer(c: Ctx, seconds: number): AudioBuffer {
-  const buf = c.createBuffer(1, Math.max(1, Math.floor(c.sampleRate * seconds)), c.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  return buf;
-}
-
-/**
- * A low, filtered stone-grind for the enemy tiles rising out of the floor. Sub
- * rumble (low-passed noise) swelling in and dying away — the "elevator" bed.
- */
-function playRumble(): void {
-  const c = audio();
-  if (!c) return;
-  try {
-    const now = c.currentTime;
-    const dur = 0.6;
-    const src = c.createBufferSource();
-    src.buffer = noiseBuffer(c, dur);
-    const lp = c.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.setValueAtTime(90, now);
-    lp.frequency.linearRampToValueAtTime(220, now + dur);
-    const g = c.createGain();
-    g.gain.setValueAtTime(0.0001, now);
-    g.gain.exponentialRampToValueAtTime(0.5, now + 0.14);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
-    src.connect(lp).connect(g).connect(c.destination);
-    src.start(now);
-    src.stop(now + dur);
-  } catch {
-    // best-effort
-  }
-}
-
 
 // --- public SFX (recorded CC0 clips — Kenney, public domain) ----------------
 
@@ -309,8 +269,8 @@ export const sfx = {
   lose: () => play(() => playSample(SAMPLES.lose, { gain: 0.75 })),
   /** Hint revealed: a gentle glass chime. */
   hint: () => play(() => playSample(SAMPLES.hint, { gain: 0.55 })),
-  /** Spawn intro: enemy tiles grinding up out of the floor (synthesized). */
-  rumble: () => play(() => playRumble()),
+  /** Spawn intro: a slow stone-drag under the tiles rising out of the floor. */
+  rumble: () => play(() => playSample(SAMPLES.rumble, { gain: 0.85 })),
   /** Spawn intro: the aggressive beast roar as the risen enemies turn their
    *  heads to face the player (CC-free Mixkit sample). */
   scare: () => play(() => playSample(SAMPLES.scare, { gain: 0.95 })),

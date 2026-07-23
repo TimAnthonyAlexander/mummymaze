@@ -75,11 +75,11 @@ Three layers, cleanly separated.
   same event API (`sfx.step/monster/key/merge/win/lose/hint/blockedWait`). Was
   procedural synths (read as "8-bit") until the 2002 pass. **See Safari gotcha
   below** — the one-time gesture unlock now also warms/decodes every sample.
-  Spawn-intro extras: `sfx.scare` (the enemies' roar on the head-turn) is a
-  copyright-free Mixkit sample (`scare.mp3`, Mixkit Free License — the ONE
-  non-Kenney/non-CC0 clip; see CREDITS.md); `sfx.rumble` (the elevator grind on
-  the rise) is SYNTHESIZED live (filtered noise), not a sample, best-effort and
-  silent without a context.
+  Spawn-intro extras (both samples now): `sfx.scare` (the enemies' roar on the
+  head-turn) is a Mixkit Free-License clip (`scare.mp3`); `sfx.rumble` (the
+  stone-drag on the rise) is `rumble.mp3` — user-supplied, licence UNVERIFIED (not
+  confirmed CC0; swap before distributing). These are the only non-Kenney/non-CC0
+  clips — see CREDITS.md.
 - `storage.ts` — safe localStorage wrapper, key `maze-escape:v1`; degrades to
   in-memory, never throws. **The `completedLevelIds` set is the SINGLE source of
   truth for progression** — there is deliberately no stored `unlockedLevelIds`
