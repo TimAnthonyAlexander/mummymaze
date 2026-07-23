@@ -454,6 +454,125 @@
   transition: opacity 340ms ease-out;
 }
 
+/* ── Enemy elevator (spawn intro) ──────────────────────────────────────────
+   Each enemy's start tile is drawn as a stone slab riding up out of a dark pit,
+   carrying the enemy (tile + enemy rise together), then the enemy whips around
+   to face the player. Sits above the walls/exit AND the dark overlay (z6) so the
+   reveal is always visible, even on dark levels; the explorer (z7) still passes
+   in front. The clip-path is open ABOVE (the enemy pokes above its tile) but
+   clipped at the tile's bottom floor line, so a slab reads as rising out of the
+   ground rather than sliding over the tile beneath it. Only rendered during the
+   spawn intro (Board.tsx); the normal monster layer is suppressed meanwhile. */
+.spawn-riser {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cell);
+  height: var(--cell);
+  z-index: 6;
+  pointer-events: none;
+  clip-path: inset(-180% 0 0 0);
+}
+
+/* The dark shaft the slab rises through — a recessed hole punched in the floor. */
+.spawn-riser__pit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: radial-gradient(
+    120% 120% at 50% 40%,
+    rgba(0, 0, 0, 0.92) 0%,
+    rgba(0, 0, 0, 0.8) 60%,
+    rgba(4, 3, 1, 0.62) 100%
+  );
+  box-shadow: inset 0 4px 8px rgba(0, 0, 0, 0.85);
+}
+
+/* The rising assembly: the slab + the enemy, moved together. Rests flush (0). */
+.spawn-riser__lift {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform: translateY(0);
+}
+/* Held sunk in the pit before the rise (only the dark hole shows). */
+.spawn-riser__lift--down {
+  transform: translateY(var(--rise-depth));
+  opacity: 0;
+}
+/* The elevator ride: up out of the pit with a small overshoot, fading in from
+   the dark as it clears the floor line. `forwards` holds it flush after. */
+.spawn-riser__lift--rising {
+  animation: spawn-rise 560ms cubic-bezier(0.16, 0.9, 0.28, 1) forwards;
+}
+@keyframes spawn-rise {
+  0% {
+    transform: translateY(var(--rise-depth));
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  82% {
+    transform: translateY(-4%);
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* The stone slab top face — the floor square that rides up. A lit top edge over
+   a shadowed underside so it reads as a solid block, not a flat tile. */
+.spawn-riser__block {
+  position: absolute;
+  inset: 0;
+  background-color: var(--floor-a);
+  background-image: var(--tex-floor-a);
+  background-repeat: repeat;
+  background-size: calc(var(--cell) * 1.35);
+  border-radius: 1px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 244, 214, 0.35),
+    inset 0 -3px 6px rgba(30, 18, 4, 0.55),
+    0 6px 10px rgba(0, 0, 0, 0.55);
+}
+
+/* The enemy standing on the slab — same box as a normal .sprite so the shared
+   .sprite__shadow / .sprite__body rules apply. The feet-in-cell nudge is set
+   inline in Board.tsx. */
+.spawn-riser__sprite {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/* The head-turn wrapper. Rests front-on; '--active' whips the enemy 180° around
+   to face the player with a scale lurch and a brief red menace glow. Perspective
+   is applied locally in the transform so the flip reads with depth. */
+.spawn-riser__turn {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 55%;
+}
+.spawn-riser__turn--active {
+  animation: spawn-headturn 460ms ease-in-out;
+}
+@keyframes spawn-headturn {
+  0% {
+    transform: perspective(520px) rotateY(180deg) scale(1);
+    filter: none;
+  }
+  55% {
+    transform: perspective(520px) rotateY(0deg) scale(1.14);
+    filter: drop-shadow(0 0 6px rgba(220, 40, 30, 0.85));
+  }
+  100% {
+    transform: perspective(520px) rotateY(0deg) scale(1);
+    filter: none;
+  }
+}
+
 /* ── Dark / flashlight levels (SPEC §2.7) ──────────────────────────────────
    A near-opaque warm-black overlay sitting ABOVE the walls/exit (z 4) but BELOW
    the sprites (z 6/7), with a soft circular hole punched at the explorer. Only

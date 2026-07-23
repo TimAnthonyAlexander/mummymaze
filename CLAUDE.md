@@ -75,6 +75,10 @@ Three layers, cleanly separated.
   same event API (`sfx.step/monster/key/merge/win/lose/hint/blockedWait`). Was
   procedural synths (read as "8-bit") until the 2002 pass. **See Safari gotcha
   below** — the one-time gesture unlock now also warms/decodes every sample.
+  TWO spawn-intro voices are the exception — `sfx.rumble` (elevator grind) and
+  `sfx.scare` (head-turn sting) are SYNTHESIZED live (oscillators + filtered
+  noise), not samples, so there's nothing to fetch/license; both are best-effort
+  and silent without a context (see `src/assets/audio/CREDITS.md`).
 - `storage.ts` — safe localStorage wrapper, key `maze-escape:v1`; degrades to
   in-memory, never throws. **The `completedLevelIds` set is the SINGLE source of
   truth for progression** — there is deliberately no stored `unlockedLevelIds`
@@ -242,7 +246,15 @@ no engine/mechanics changed. Key pieces:
 - **Animations** (`useAnimatedGame.ts` + `Board.tsx/.css`, view-only): a
   **spawn-in** intro (board starts black, explorer walks in from the right edge
   to its start tile, then lights come up — full reveal on lit levels, torch view
-  on dark ones; one-time per load, skippable, snaps when animations off); the
+  on dark ones; then the **enemy elevator**: each enemy's start tile rises up out
+  of a dark pit carrying the enemy, and the risen enemies whip 180° around to
+  face the player with a scare sting — one-time per load, skippable, snaps when
+  animations off). The elevator is driven by a `SpawnPhase` machine
+  (`dark`→`reveal`→`rise`→`turn`, then null) on `RenderState`: the normal monster
+  layer is suppressed for every non-null phase and the enemies are drawn instead
+  by `SpawnRisers` (a per-enemy pit + rising slab + sprite, CSS `spawn-rise` /
+  `spawn-headturn`, clip-pathed at the tile floor line so slabs emerge from the
+  ground). The
   **win-exit** walk; and a monster/player **crash** (loser squash-and-fade
   knockout + survivor recoil + a **gray smoke cloud + gold sparkles** with the
   merge sound, held so it finishes before the turn settles — also fired when the

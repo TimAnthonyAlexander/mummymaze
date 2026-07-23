@@ -394,6 +394,78 @@ const MoveArrows = memo(function MoveArrows({
   );
 });
 
+/**
+ * The spawn-intro enemy elevator. For each living enemy, draws its start tile as
+ * a stone slab riding up out of a dark pit carrying the enemy (tile + enemy rise
+ * together), then the enemy whips 180° around to face the player. Rendered only
+ * during the spawn intro (the normal monster layer is suppressed meanwhile). All
+ * motion is CSS (Board.css `spawn-rise` / `spawn-headturn`), triggered by the
+ * phase-derived classes; the JS timeline in useAnimatedGame just advances phase.
+ *   'reveal' → slabs held sunk in their pits (only the dark holes show).
+ *   'rise'   → slabs + enemies grind up to flush.
+ *   'turn'   → the risen enemies rotate to face the player.
+ * A per-riser `clip-path` (Board.css) hides everything below the tile's floor
+ * line, so a slab reads as emerging from the ground rather than sliding over the
+ * tile beneath it.
+ */
+function SpawnRisers({
+  monsters,
+  phase,
+  cell,
+  charSize,
+}: {
+  monsters: RenderState['monsters'];
+  phase: 'reveal' | 'rise' | 'turn';
+  cell: number;
+  charSize: number;
+}) {
+  const depth = Math.round(cell * 1.15);
+  const nudgeX = cell * 0.03;
+  const nudgeY = cell * 0.07;
+  const liftClass =
+    phase === 'reveal'
+      ? ' spawn-riser__lift--down'
+      : phase === 'rise'
+        ? ' spawn-riser__lift--rising'
+        : '';
+  const turnActive = phase === 'turn' ? ' spawn-riser__turn--active' : '';
+  return (
+    <>
+      {monsters
+        .filter((m) => m.alive)
+        .map((m) => (
+          <div
+            key={`riser-${m.id}`}
+            className="spawn-riser"
+            style={
+              {
+                transform: `translate(${m.pos.x * cell}px, ${m.pos.y * cell}px)`,
+                '--rise-depth': `${depth}px`,
+              } as CSSProperties
+            }
+            aria-hidden="true"
+          >
+            <span className="spawn-riser__pit" />
+            <span className={`spawn-riser__lift${liftClass}`}>
+              <span className="spawn-riser__block" />
+              <span
+                className="spawn-riser__sprite"
+                style={{ transform: `translate(${-nudgeX}px, ${-nudgeY}px)` }}
+              >
+                <span className="sprite__shadow" />
+                <span className={`spawn-riser__turn${turnActive}`}>
+                  <span className="sprite__body">
+                    <MonsterSprite kind={m.kind} size={charSize} />
+                  </span>
+                </span>
+              </span>
+            </span>
+          </div>
+        ))}
+    </>
+  );
+}
+
 interface BoardProps {
   level: Level;
   render: RenderState;
@@ -545,8 +617,11 @@ export function Board({
             a monster outside the torchlight shows only as faint glowing eyes.
             The `.sprite__fx` wrapper carries the crash animation (squash+fade for
             a knockout, a quick pulse for the survivor) so it never fights the
-            outer position transform or the body's facing mirror. */}
-        {render.monsters
+            outer position transform or the body's facing mirror. Suppressed during
+            the spawn intro — the enemies are drawn in the riser layer instead as
+            they ride up out of the floor (see SpawnRisers below). */}
+        {!render.spawn &&
+          render.monsters
           .filter((m) => m.alive)
           .map((m) => {
             const lit = !dark || isLit(render.player, m.pos, dark.radius);
@@ -598,11 +673,26 @@ export function Board({
           </span>
         </div>
 
+        {/* Enemy elevator: on every spawn phase after the curtain lifts, the
+            enemies ride up out of the floor on their own tiles and then whip
+            around to face the player. Drawn above the walls/exit and the dark
+            overlay so the reveal is always visible, even on dark levels. */}
+        {(render.spawn === 'reveal' || render.spawn === 'rise' || render.spawn === 'turn') && (
+          <SpawnRisers
+            monsters={render.monsters}
+            phase={render.spawn}
+            cell={cell}
+            charSize={charSize}
+          />
+        )}
+
         {/* Spawn-in intro: a full-black curtain over the whole field (above walls,
             gates, exit, and monsters at z6, but below the explorer at z7 so it can
             be seen walking in). `--dark` is opaque; `--reveal` fades it out to lift
-            the lights (revealing the board, or the torch view on dark levels). */}
-        {render.spawn && (
+            the lights (revealing the board, or the torch view on dark levels).
+            Only for the dark/reveal phases — by the time the enemies rise it is
+            gone. */}
+        {(render.spawn === 'dark' || render.spawn === 'reveal') && (
           <div
             className={`board__spawn board__spawn--${render.spawn}`}
             style={{ width: cell * level.width, height: cell * level.height }}

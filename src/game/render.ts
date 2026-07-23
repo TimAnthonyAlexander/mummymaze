@@ -28,8 +28,16 @@ export interface CrashPuff {
   readonly pos: Pos;
 }
 
-/** The one-time spawn-in intro state: full black, then lifting to reveal the board. */
-export type SpawnPhase = 'dark' | 'reveal';
+/**
+ * The one-time spawn-in intro sequence:
+ *   'dark'   — full black curtain while the explorer walks in.
+ *   'reveal' — the curtain lifts; the board lights up with the enemy tiles still
+ *              sunk as dark pits (enemies underground).
+ *   'rise'   — the enemy tiles + their enemies ride up out of the floor.
+ *   'turn'   — the risen enemies whip around to face the player (scare sting).
+ * `null` once settled into normal play.
+ */
+export type SpawnPhase = 'dark' | 'reveal' | 'rise' | 'turn';
 
 export interface RenderState {
   readonly player: Pos;

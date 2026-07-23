@@ -245,6 +245,117 @@ function play(fn: () => void): void {
   fn();
 }
 
+// --- synthesized voices (spawn intro) ---------------------------------------
+// The spawn intro's rise + head-turn are one-off cinematic stings, not the
+// recorded-sample gameplay blips. They're synthesized on the shared context so
+// there's nothing to fetch/decode and no licensing to track. All best-effort:
+// a missing/failed context degrades to silence and never throws.
+
+/** Fill a mono AudioBuffer with white noise. */
+function noiseBuffer(c: Ctx, seconds: number): AudioBuffer {
+  const buf = c.createBuffer(1, Math.max(1, Math.floor(c.sampleRate * seconds)), c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+/**
+ * A low, filtered stone-grind for the enemy tiles rising out of the floor. Sub
+ * rumble (low-passed noise) swelling in and dying away — the "elevator" bed.
+ */
+function playRumble(): void {
+  const c = audio();
+  if (!c) return;
+  try {
+    const now = c.currentTime;
+    const dur = 0.6;
+    const src = c.createBufferSource();
+    src.buffer = noiseBuffer(c, dur);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(90, now);
+    lp.frequency.linearRampToValueAtTime(220, now + dur);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(0.5, now + 0.14);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    src.connect(lp).connect(g).connect(c.destination);
+    src.start(now);
+    src.stop(now + dur);
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * The scare sting fired as the risen enemies whip around to face the player: a
+ * dissonant low drone that bends downward (dread), a band-passed noise riser
+ * swelling to a peak, and a short high metallic shiver at the top. ~1s total.
+ */
+function playScare(): void {
+  const c = audio();
+  if (!c) return;
+  try {
+    const now = c.currentTime;
+    const master = c.createGain();
+    master.gain.value = 0.85;
+    master.connect(c.destination);
+
+    // Two detuned saw drones a hair apart (beating = unease), bending down.
+    const bend = 0.9;
+    for (const f of [55, 58.3]) {
+      const o = c.createOscillator();
+      o.type = 'sawtooth';
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 460;
+      const g = c.createGain();
+      o.frequency.setValueAtTime(f * 1.5, now);
+      o.frequency.exponentialRampToValueAtTime(f * 0.5, now + bend);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(0.42, now + 0.06);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + bend + 0.2);
+      o.connect(lp).connect(g).connect(master);
+      o.start(now);
+      o.stop(now + bend + 0.25);
+    }
+
+    // Band-passed noise riser sweeping up to the peak, then cut.
+    const nDur = 0.7;
+    const noise = c.createBufferSource();
+    noise.buffer = noiseBuffer(c, nDur);
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 0.8;
+    bp.frequency.setValueAtTime(320, now);
+    bp.frequency.exponentialRampToValueAtTime(2600, now + nDur);
+    const ng = c.createGain();
+    ng.gain.setValueAtTime(0.0001, now);
+    ng.gain.exponentialRampToValueAtTime(0.32, now + nDur * 0.72);
+    ng.gain.exponentialRampToValueAtTime(0.0001, now + nDur + 0.1);
+    noise.connect(bp).connect(ng).connect(master);
+    noise.start(now);
+    noise.stop(now + nDur + 0.1);
+
+    // High metallic shiver stab (two detuned triangles) at the turn.
+    const t = now + 0.04;
+    for (const f of [1750, 1868]) {
+      const o = c.createOscillator();
+      o.type = 'triangle';
+      const g = c.createGain();
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.11, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+      o.connect(g).connect(master);
+      o.start(t);
+      o.stop(t + 0.55);
+    }
+  } catch {
+    // best-effort
+  }
+}
+
 // --- public SFX (recorded CC0 clips — Kenney, public domain) ----------------
 
 export const sfx = {
@@ -264,6 +375,10 @@ export const sfx = {
   lose: () => play(() => playSample(SAMPLES.lose, { gain: 0.75 })),
   /** Hint revealed: a gentle glass chime. */
   hint: () => play(() => playSample(SAMPLES.hint, { gain: 0.55 })),
+  /** Spawn intro: enemy tiles grinding up out of the floor (synthesized). */
+  rumble: () => play(() => playRumble()),
+  /** Spawn intro: the risen enemies turning to face the player (synthesized). */
+  scare: () => play(() => playScare()),
 };
 
 /** Test-only seam: reset cached state between cases. */

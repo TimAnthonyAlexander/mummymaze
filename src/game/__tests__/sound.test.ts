@@ -39,6 +39,8 @@ describe('sound engine (no AudioContext)', () => {
       sfx.win();
       sfx.lose();
       sfx.hint();
+      sfx.rumble();
+      sfx.scare();
     }).not.toThrow();
   });
 });

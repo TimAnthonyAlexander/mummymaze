@@ -19,3 +19,13 @@ License: Creative Commons Zero (CC0 1.0) —
 | `lose.mp3` | level lost | `impactWood_heavy_000` (Impact) |
 | `hint.mp3` | hint revealed | `glass_001` (Interface) |
 | `blocked.mp3` | blocked move / wait | `impactSoft_medium_000` (Impact) |
+
+## Synthesized voices (not samples)
+
+Two spawn-intro stings are synthesized live in the Web Audio graph (`sound.ts`),
+so there is no file and nothing to license:
+
+- **rumble** — a low, filtered stone-grind as the enemy tiles rise out of the
+  floor (the "elevator" bed).
+- **scare** — a dissonant down-bending drone + noise riser + high metallic
+  shiver, fired as the risen enemies whip around to face the player.

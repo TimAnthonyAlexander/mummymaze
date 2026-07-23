@@ -42,6 +42,10 @@ const SPAWN_HOP_MS = 125; // per walk-in hop (>= the sprite CSS transition, so i
 const SPAWN_HOLD_MS = 150; // beat of total darkness before the explorer starts walking
 const SPAWN_REVEAL_MS = 380; // lights-on fade (must exceed the .board__spawn CSS transition)
 const MAX_SPAWN_HOPS = 4; // cap the walk-in so the intro stays snappy on wide boards
+// Enemy elevator + head-turn (must each exceed the matching Board.css animation).
+const SPAWN_PIT_HOLD_MS = 240; // beat with the empty pits showing before they rise
+const SPAWN_RISE_MS = 620; // tiles + enemies ride up out of the floor
+const SPAWN_TURN_MS = 600; // enemies whip around to face the player
 
 interface Frame {
   dur: number;
@@ -353,9 +357,12 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
    * The one-time spawn-in intro: the board starts in total darkness while the
    * explorer walks in from just off the right edge, hopping west along its start
    * row into its real cell, then the lights lift (a full reveal on lit levels; the
-   * normal torch view on dark ones). It is a pure visual pre-roll — the committed
-   * engine state is already the true start — so any input cancels it (see `move`).
-   * With animations off or reduced motion, we just snap to the settled board.
+   * normal torch view on dark ones). With the board lit, the enemy tiles rise up
+   * out of the floor like elevators (tile + enemy together) and the risen enemies
+   * turn to face the player with a scare sting. It is a pure visual pre-roll — the
+   * committed engine state is already the true start — so any input cancels it
+   * (see `move`). With animations off or reduced motion, we just snap to the
+   * settled board.
    */
   const playSpawn = useCallback(
     (startState: GameState) => {
@@ -387,8 +394,18 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
           sound: sfx.step,
         });
       }
-      // Lights on: lift the black overlay. The explorer is already home.
+      // Lights on: lift the black overlay. The explorer is already home. The
+      // enemy tiles stay sunk as dark pits (Board draws the enemies in the riser
+      // layer, not the normal one, for every spawn phase after 'dark').
       frames.push({ dur: SPAWN_REVEAL_MS, apply: (r) => ({ ...r, spawn: 'reveal' }) });
+      // Then the enemy elevator: a beat with the pits showing, the tiles + enemies
+      // grinding up out of the floor, and finally the enemies whipping around to
+      // face the player with a scare sting. Skipped when the level has no enemies.
+      if (base.monsters.some((m) => m.alive)) {
+        frames.push({ dur: SPAWN_PIT_HOLD_MS, apply: (r) => r });
+        frames.push({ dur: SPAWN_RISE_MS, apply: (r) => ({ ...r, spawn: 'rise' }), sound: sfx.rumble });
+        frames.push({ dur: SPAWN_TURN_MS, apply: (r) => ({ ...r, spawn: 'turn' }), sound: sfx.scare });
+      }
       spawningRef.current = true;
       play(frames, startRender, base, () => {
         spawningRef.current = false;
