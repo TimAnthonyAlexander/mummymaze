@@ -38,7 +38,7 @@ import { loadSave } from './storage';
 // a deliberate walk while the player's own move stays snappy. Each slightly
 // exceeds the board's matching *_ANIM_MS so a hop settles and rests before the
 // next round — the short pause between a mummy's two steps.
-const PLAYER_HOP_MS = 300; // player hop (round 0) + generic player-only frames
+const PLAYER_HOP_MS = 380; // player hop (round 0); spans the DAM-DUMDUM step triple
 const MONSTER_HOP_MS = 600; // monster step-tick (round >= 1)
 const KILL_MS = 110; // pause when a monster is destroyed
 const CRASH_HOLD_MS = 360; // hold after a crash so the smoke + sparkles finish before settle
@@ -125,17 +125,6 @@ function applyCrash(r: RenderState, loserId: string, tile: Pos | null): RenderSt
   return { ...r, monsters, puffs };
 }
 
-/**
- * A mummy's heavy tread: THREE quick footfalls per step (BAM-BAM-BAM), so its
- * double move reads as two triples (six thumps). Scorpions keep a single thump.
- */
-const STOMP_GAP_MS = 90;
-function monsterStomp(): void {
-  sfx.monster();
-  window.setTimeout(() => sfx.monster(), STOMP_GAP_MS);
-  window.setTimeout(() => sfx.monster(), STOMP_GAP_MS * 2);
-}
-
 /** Mutations + sounds gathered for one simultaneity tick. */
 interface Round {
   applies: ((r: RenderState) => RenderState)[];
@@ -183,7 +172,7 @@ function buildFrames(
         lastMoveTo = to;
         b.applies.push((r) => setActorPos(r, actor, to));
         if (actor === 'player') {
-          b.sounds.push(sfx.step);
+          b.sounds.push(sfx.playerStep);
         } else {
           // One footfall per step-TICK (round), shared by all monsters stepping
           // together this tick. A mummy makes it a heavy TRIPLE; a scorpion a
@@ -221,7 +210,7 @@ function buildFrames(
     const { applies, sounds, hasKill, monsterStomps } = rounds.get(round)!;
     // Round 0 is the player's hop; rounds >= 1 are the slower monster step-ticks.
     const base = round === 0 ? PLAYER_HOP_MS : MONSTER_HOP_MS;
-    const footfall = monsterStomps === 3 ? monsterStomp : monsterStomps === 1 ? sfx.monster : null;
+    const footfall = monsterStomps === 3 ? sfx.mummyStep : monsterStomps === 1 ? sfx.monster : null;
     const roundSounds = footfall ? [...sounds, footfall] : sounds;
     frames.push({
       dur: hasKill ? base + KILL_MS : base,

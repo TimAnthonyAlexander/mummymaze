@@ -248,6 +248,65 @@ function playSample(urls: readonly string[], opts: PlayOpts = {}): void {
   }
 }
 
+/** Play a footstep clip at a fixed pitch through a lowpass (darkness control),
+ *  scheduled `delay` seconds ahead on the audio clock (tight, jitter-free). */
+function playStepPitched(rate: number, gain: number, delay: number, lowpass: number): void {
+  const c = audio();
+  if (!c) return;
+  const urls = SAMPLES.step;
+  const url = urls[(Math.random() * urls.length) | 0];
+  const buf = bufCache.get(url);
+  if (!buf) {
+    decodeSample(c, url); // decode now; this hit is silent, the next will land
+    return;
+  }
+  try {
+    const src = c.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate * (0.985 + Math.random() * 0.03); // tiny vary
+    // Lowpass sets the darkness: low cutoff = a dark, hollow thud (a mummy);
+    // high cutoff = bright and light (the human). A little resonance = hollow.
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = lowpass;
+    lp.Q.value = 0.9;
+    const g = c.createGain();
+    g.gain.value = gain;
+    src.connect(lp).connect(g).connect(c.destination);
+    src.start(c.currentTime + Math.max(0, delay));
+  } catch {
+    // A failed voice must never bubble up into gameplay.
+  }
+}
+
+// A three-hit tread, per step: one accented note then two notes tighter together
+// — "DAM DUMDUM" (GAP2 < GAP1). Shared rhythm; the mummy and the human differ
+// only in pitch/darkness/volume.
+const STEP_GAP1 = 0.22; // DAM → first DUM (a clear beat, not a blur)
+const STEP_GAP2 = 0.12; // first DUM → second DUM (tighter, so they pair as "DUMDUM")
+
+/** DAM (accented) + DUM + DUM at (damRate/dumRate) pitch, `lowpass` darkness. */
+function tripleStep(
+  damRate: number,
+  dumRate: number,
+  lowpass: number,
+  gainDam: number,
+  gainDum: number,
+): void {
+  playStepPitched(damRate, gainDam, 0, lowpass); // DAM
+  playStepPitched(dumRate, gainDum, STEP_GAP1, lowpass); // DUM
+  playStepPitched(dumRate, gainDum, STEP_GAP1 + STEP_GAP2, lowpass); // DUM (tight)
+}
+
+// Mummy: low pitch + low cutoff + loud = a dark, heavy, scary tread.
+const MUMMY_DAM_RATE = 0.82;
+const MUMMY_DUM_RATE = 0.58;
+const MUMMY_LOWPASS = 900;
+// Human: high pitch + open cutoff + soft = a light, quick patter.
+const HUMAN_DAM_RATE = 1.5;
+const HUMAN_DUM_RATE = 1.12;
+const HUMAN_LOWPASS = 7000;
+
 /** Run `fn` only when sound is enabled and audio is usable. */
 function play(fn: () => void): void {
   if (!isSoundEnabled()) return;
@@ -267,6 +326,11 @@ export const sfx = {
    *  distinct from the player's lighter step. One per step-tick (see buildFrames),
    *  so a mummy's two steps are two footfalls. */
   monster: () => play(() => playSample(SAMPLES.step, { gain: 0.5, vary: true, rate: 0.78 })),
+  /** A mummy's single step: a dark, heavy triple footfall ("DAM DUMDUM"). Called
+   *  once per mummy step-tick, so its double move reads as two triples. */
+  mummyStep: () => play(() => tripleStep(MUMMY_DAM_RATE, MUMMY_DUM_RATE, MUMMY_LOWPASS, 0.54, 0.4)),
+  /** The human's step: the SAME triple, but much lighter — high, bright, soft. */
+  playerStep: () => play(() => tripleStep(HUMAN_DAM_RATE, HUMAN_DUM_RATE, HUMAN_LOWPASS, 0.34, 0.24)),
   /** Key pickup / gate toggle: a metal latch. */
   key: () => play(() => playSample(SAMPLES.key, { gain: 0.6 })),
   /** Monster collision: a heavy soft thud. */

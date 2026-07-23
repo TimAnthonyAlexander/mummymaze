@@ -43,7 +43,7 @@ const CRASH_SPARK_ANGLES = [8, 62, 128, 182, 246, 312];
  *  the "super short pause" between a mummy's two steps, not a hard stop. Monsters
  *  hop about 2× slower than the player so their pursuit reads as a deliberate
  *  walk (the player's own move stays snappy/responsive). */
-const PLAYER_ANIM_MS = 290;
+const PLAYER_ANIM_MS = 370; // slowed to span the player's DAM-DUMDUM step triple
 const MONSTER_ANIM_MS = 580;
 /** Gentle, near-linear ease: each single step is a slow even glide that only eases
  *  slightly at its ends, so it reads as a deliberate WALK to each tile with a faint
