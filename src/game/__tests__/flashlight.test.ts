@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Pos } from '../../engine';
-import { isLit, lightLevel } from '../flashlight';
+import { EYES_FADE_IN, eyeLevel, isLit, lightLevel } from '../flashlight';
 
 const c: Pos = { x: 2, y: 2 };
 
@@ -74,5 +74,29 @@ describe('lightLevel (torch falloff)', () => {
     const a: Pos = { x: 1, y: 5 };
     const b: Pos = { x: 3, y: 6 };
     expect(lightLevel(a, b, 2)).toBe(lightLevel(b, a, 2));
+  });
+});
+
+describe('eyeLevel (glowing-eyes fallback)', () => {
+  it('is off while the body is still visible', () => {
+    // The reported bug: a monster two down and one right (dist ~2.24, ~35% lit)
+    // showed a clearly visible body AND eyes at the same time.
+    const light = lightLevel(c, { x: 3, y: 4 }, 2);
+    expect(light).toBeGreaterThan(EYES_FADE_IN);
+    expect(eyeLevel(light)).toBe(0);
+  });
+
+  it('is fully on where the body is gone', () => {
+    expect(eyeLevel(0)).toBe(1);
+  });
+
+  it('never overlaps a fully lit body', () => {
+    expect(eyeLevel(1)).toBe(0);
+  });
+
+  it('ramps in below the threshold', () => {
+    const v = eyeLevel(EYES_FADE_IN / 2);
+    expect(v).toBeGreaterThan(0);
+    expect(v).toBeLessThan(1);
   });
 });

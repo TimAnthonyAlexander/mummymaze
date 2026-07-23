@@ -44,3 +44,20 @@ export function lightLevel(center: Pos, tile: Pos, radius: number): number {
   if (d >= outer) return 0;
   return 1 - (d - inner) / (outer - inner);
 }
+
+/** Light level at which the glowing eyes begin to appear. */
+export const EYES_FADE_IN = 0.3;
+
+/**
+ * How strongly the glowing eyes show, given a tile's `lightLevel`.
+ *
+ * They are a fallback for when you CANNOT make out the body, so they must not
+ * overlap it: a straight `1 - light` cross-fade put both on screen through the
+ * whole middle of the falloff (a monster two down and one right sits at ~2.24
+ * tiles, i.e. ~35% lit — clearly visible, yet the eyes were already at ~65%).
+ * Instead they stay off until the body has faded to `EYES_FADE_IN`, then ramp.
+ */
+export function eyeLevel(light: number): number {
+  if (light >= EYES_FADE_IN) return 0;
+  return 1 - light / EYES_FADE_IN;
+}

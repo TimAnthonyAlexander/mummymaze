@@ -11,7 +11,7 @@ import {
   neighbor,
   samePos,
 } from '../engine';
-import { lightLevel } from '../game/flashlight';
+import { eyeLevel, lightLevel } from '../game/flashlight';
 import type { RenderState } from '../game/render';
 import { boardTextures } from '../game/textures';
 import { BoardAnnotations } from './BoardAnnotations';
@@ -559,8 +559,8 @@ function SpawnRisers({
                     className="spawn-riser__sprite"
                     style={{ transform: `translate(${-nudgeX}px, ${-nudgeY}px)` }}
                   >
-                    {light < 1 && (
-                      <span className="spawn-riser__eyes" style={{ ...facing, opacity: 1 - light }}>
+                    {eyeLevel(light) > 0 && (
+                      <span className="spawn-riser__eyes" style={{ ...facing, opacity: eyeLevel(light) }}>
                         <span className="dark-eyes">
                           <span className="dark-eye" />
                           <span className="dark-eye" />
@@ -934,8 +934,8 @@ export function Board({
                 className="sprite sprite--monster"
                 style={charStyle(m.pos, cell)}
               >
-                {light < 1 && (
-                  <span className="sprite__eyes" style={{ opacity: 1 - light }}>
+                {eyeLevel(light) > 0 && (
+                  <span className="sprite__eyes" style={{ opacity: eyeLevel(light) }}>
                     <span className="dark-eyes" style={facing}>
                       <span className="dark-eye" />
                       <span className="dark-eye" />
