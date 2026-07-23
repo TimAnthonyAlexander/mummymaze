@@ -22,6 +22,13 @@ export interface UseHints {
   solution: Action[] | null;
   /** True when the last request found no win from the current state. */
   unsolvable: boolean;
+  /**
+   * Live unsolvability flag, recomputed automatically after every move/undo/load
+   * (not just on a button press). Drives the blood-red ankh. Unlike
+   * `unsolvable` (the button-triggered one behind "Show solution") it never
+   * surfaces the solution or a text hint, so it can't spoil the puzzle.
+   */
+  liveUnsolvable: boolean;
   /** Whether the one-per-level plain hint has been spent for this level. */
   hintUsed: boolean;
   /** Reveal the next optimal move (spends the level's hint budget). */
@@ -35,6 +42,7 @@ export function useHints(state: GameState): UseHints {
   const [hintDir, setHintDir] = useState<Action | null>(null);
   const [solution, setSolution] = useState<Action[] | null>(null);
   const [unsolvable, setUnsolvable] = useState(false);
+  const [liveUnsolvable, setLiveUnsolvable] = useState(false);
   const [usedLevels, setUsedLevels] = useState<ReadonlySet<string>>(new Set());
 
   // Any change to the authoritative state (move / undo / restart / load) makes
@@ -44,6 +52,28 @@ export function useHints(state: GameState): UseHints {
     setHintDir(null);
     setSolution(null);
     setUnsolvable(false);
+  }, [state]);
+
+  // Live unsolvability detection: run the exact solver from the current position
+  // after every state change so the ankh turns red the instant the maze becomes
+  // unwinnable — no button press required. Only meaningful while it's the
+  // player's turn; a won/lost state is never flagged. Deferred to a timeout so
+  // the BFS never blocks the just-committed move's hop animation, and cancelled
+  // if the state changes again before it finishes.
+  useEffect(() => {
+    if (state.phase !== 'player') {
+      setLiveUnsolvable(false);
+      return;
+    }
+    let cancelled = false;
+    const id = setTimeout(() => {
+      const result = solveFrom(state);
+      if (!cancelled) setLiveUnsolvable(!result.solvable);
+    }, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(id);
+    };
   }, [state]);
 
   const requestHint = useCallback(() => {
@@ -83,10 +113,11 @@ export function useHints(state: GameState): UseHints {
       hintDir,
       solution,
       unsolvable,
+      liveUnsolvable,
       hintUsed: usedLevels.has(levelId),
       requestHint,
       showSolution,
     }),
-    [hintDir, solution, unsolvable, usedLevels, levelId, requestHint, showSolution],
+    [hintDir, solution, unsolvable, liveUnsolvable, usedLevels, levelId, requestHint, showSolution],
   );
 }

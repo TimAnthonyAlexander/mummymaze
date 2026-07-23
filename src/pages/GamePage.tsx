@@ -179,6 +179,7 @@ export function GamePage() {
         hintUsed={hints.hintUsed}
         solution={hints.solution}
         unsolvable={hints.unsolvable}
+        liveUnsolvable={hints.liveUnsolvable}
         onSelectLevel={selectLevel}
         onResetProgress={progress.resetProgress}
         onOpenMap={openMap}

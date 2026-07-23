@@ -26,6 +26,7 @@ interface SidebarProps {
   hintUsed: boolean;
   solution: Action[] | null;
   unsolvable: boolean;
+  liveUnsolvable: boolean;
   onSelectLevel: (id: string) => void;
   onResetProgress: () => void;
   onOpenMap: () => void;
@@ -56,6 +57,7 @@ export const Sidebar = memo(function Sidebar({
   hintUsed,
   solution,
   unsolvable,
+  liveUnsolvable,
   onSelectLevel,
   onResetProgress,
   onOpenMap,
@@ -139,7 +141,7 @@ export const Sidebar = memo(function Sidebar({
           </RouterLink>
 
           <Box className="stone-plaque" sx={{ mt: 0.5 }}>
-            <Ankh size={34} className="stone-plaque__ankh" dead={unsolvable} />
+            <Ankh size={34} className="stone-plaque__ankh" dead={liveUnsolvable} />
             <Stack
               direction="row"
               sx={{ alignItems: 'baseline', justifyContent: 'space-between', gap: 1, mb: 0.5, pr: 3.5 }}
