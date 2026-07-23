@@ -240,15 +240,15 @@ const GEN_SLOTS = [
   {
     name: 'The Warren',
     mechanic: 'Three hunters, walls and two traps',
-    size: 8,
+    size: 7,
     monsters: ['mummy_white', 'mummy_red', 'scorpion_white'],
     wallDensity: 0.06,
     traps: 2,
   },
   {
     name: 'Final Trial',
-    mechanic: 'Everything at once: three hunters, walls and traps on the largest board',
-    size: 9,
+    mechanic: 'Everything at once: three hunters, walls and traps on a compact board',
+    size: 8,
     monsters: ['mummy_white', 'mummy_red', 'scorpion_red'],
     wallDensity: 0.08,
     traps: 2,
@@ -298,9 +298,13 @@ function optsFromSlot(slot, id, index) {
 // Pyramids 1-2 are the hand-authored + first generated content; pyramids 3..20
 // are grown here. Two design rules the tier model encodes:
 //
-//   * Boards stay SMALL (<= 12). Difficulty rises via MORE walls / traps / keys
-//     / monsters, NEVER via ever-larger boards. Walls in particular raise the
-//     "tension" (forced-move fraction) and par while SHRINKING the reachable
+//   * Boards stay SMALL and are HARD-CAPPED at 9x9 (a 10+ board reads as too
+//     sprawling for this genre). Size scales only SLIGHTLY with difficulty: a
+//     per-tier ceiling drifts up 7 -> 8 -> 9 across the pyramids, and inside a
+//     pyramid the floors climb base->apex up to that ceiling. Past the cap,
+//     difficulty rises via MORE walls / traps / forced keys / monsters and
+//     LONGER solutions, NEVER via ever-larger boards. Walls in particular raise
+//     the "tension" (forced-move fraction) and par while SHRINKING the reachable
 //     state space — so they make levels harder AND faster to solve.
 //   * Difficulty rises GENTLY. Each tier gets a target difficulty WINDOW that
 //     drifts up per pyramid; inside a pyramid the 10 levels climb base->apex.
@@ -312,6 +316,24 @@ function optsFromSlot(slot, id, index) {
 const EXTEND_CAP = 250_000;
 /** Difficulty floor for every generated level (keeps them above pyramid 1). */
 const EXTEND_FLOOR = 30;
+/** HARD board-size cap. Bigger boards read as too sprawling for this genre; all
+ *  added difficulty past this comes from walls / traps / forced keys / monsters
+ *  / longer solutions, not area. */
+const MAX_SIZE = 9;
+
+/**
+ * Is level `idx` (0-based) a real, forced LOCK-AND-KEY for its tier? The cadence
+ * RISES with difficulty so "forced keys" become a bigger part of the challenge
+ * higher up (moderate ramp: ~1-in-4 early, ~3 per pyramid from mid-tier). The
+ * dark apex is never a key level (a key is unreadable under a radius-2 torch).
+ */
+function tierKeySlot(idx, t, pos, isApex) {
+  if (isApex) return false;
+  // Mid/high tiers: keys at pos 1,4,7 -> three forced-key floors per pyramid.
+  if (t >= 7) return pos % 3 === 1;
+  // Early tiers keep the sparse global ~1-in-4 cadence.
+  return isKeyLevel(idx, isApex);
+}
 
 /**
  * Tier plan for a 0-based global play index. Pyramid = floor(idx/10)+1 (1..18),
@@ -321,9 +343,10 @@ const EXTEND_FLOOR = 30;
  *
  * Two design rules the ramp encodes:
  *   * BOARD SIZE climbs base->apex within every pyramid (fewer squares on the
- *     lower rungs, biggest at the point) and drifts up gently per pyramid. This
- *     echoes the original's 6/8/10 lattices and — because the apex is the biggest
- *     board — keeps a radius-2 torch on the DARK apex mostly in the dark.
+ *     lower rungs, biggest at the point) and drifts up gently per pyramid, but is
+ *     HARD-CAPPED at 9x9 — a per-tier ceiling rises 7 -> 8 -> 9, never past it.
+ *     This echoes the original's small lattices and — because the apex is the
+ *     biggest board — keeps a radius-2 torch on the DARK apex mostly in the dark.
  *   * Difficulty rises across pyramids and base->apex. The FLOOR is lenient so
  *     small boards always fill; the dark apex is gentler (darkness is itself the
  *     hazard) and is exempt from the pack's difficulty-ramp check.
@@ -334,13 +357,22 @@ function tierPlan(idx) {
   const t = pyramid;
   const isApex = pos === 9;
 
-  // SIZE RAMP: fewer squares at the base, biggest at the apex; +0..+4 across the
-  // pyramid, base drifts up per tier. Capped at 12.
-  const baseSize = 6 + Math.floor(t / 4); // t1-3:6, t4-7:7, t8-11:8, t12-15:9, t16-18:10
-  const size = Math.min(12, baseSize + Math.round((pos * 4) / 9)); // base .. base+4
+  // SIZE RAMP (hard-capped at MAX_SIZE=9). A per-tier CEILING drifts up gently
+  // with difficulty (7 -> 8 -> 9); a per-tier FLOOR also drifts up so the hardest
+  // pyramids never get a trivially tiny board. Inside a pyramid the floors climb
+  // base->apex up to the ceiling, so the apex is always the biggest board (its
+  // radius-2 torch stays mostly dark) and buildPyramids can order floors by size.
+  const tierMax = Math.min(MAX_SIZE, t <= 2 ? 7 : t <= 5 ? 8 : 9);
+  const tierMin = Math.min(tierMax, t <= 4 ? 6 : t <= 10 ? 7 : 8);
+  const size = Math.min(
+    tierMax,
+    tierMin + Math.round((pos * (tierMax - tierMin)) / 9),
+  ); // base(tierMin) .. apex(tierMax)
 
-  // Monsters rise gently (capped 5); the dark apex stays lighter.
-  const litCount = Math.min(5, 2 + Math.floor((t - 1) / 4) + (pos >= 6 ? 1 : 0));
+  // Monsters rise with tier and toward the apex (capped 5); the dark apex lighter.
+  // Now that boards are small and capped, more hunters is a primary difficulty
+  // lever — a crowded 9x9 is far tenser than a sparse 12x12 ever was.
+  const litCount = Math.min(5, 2 + Math.floor((t - 1) / 4) + (pos >= 5 ? 1 : 0));
   const monsterCount = isApex ? Math.min(3, 1 + Math.floor((t - 1) / 6)) : litCount;
   const monsters = [];
   for (let j = 0; j < monsterCount; j++) {
@@ -352,17 +384,19 @@ function tierPlan(idx) {
     monsters[0] = idx % 2 === 0 ? 'mummy_white' : 'mummy_red';
   }
 
-  // Primary difficulty levers: walls + traps + a key/gate (fast, high-tension).
-  const wallDensity = Math.min(0.16, 0.05 + 0.006 * (t - 1) + 0.004 * pos);
-  const traps = Math.min(5, Math.floor((t - 1) / 3) + Math.floor(pos / 4));
+  // Primary difficulty levers now that size is capped: denser walls + more traps
+  // + more forced keys (fast, high-tension, and they SHRINK the state space).
+  const wallDensity = Math.min(0.2, 0.05 + 0.008 * (t - 1) + 0.006 * pos);
+  const traps = Math.min(6, Math.floor((t - 1) / 3) + Math.floor(pos / 3));
 
-  // Gently rising difficulty window and a lenient floor (small boards fill).
-  const center = 14 + (t - 1) * 2.2 + pos * 1.8;
+  // Rising difficulty window (drives LONGER solutions); lenient floor so the
+  // small boards always fill; the dark apex is gentler (darkness is the hazard).
+  const center = 14 + (t - 1) * 2.4 + pos * 1.9;
   const floor = isApex ? 8 : 12;
 
-  // ~1-in-4 levels are a real lock-and-key (sealed exit, key required); a dark
+  // Forced lock-and-key levels: cadence rises with tier (see tierKeySlot). A dark
   // apex never is (a key is unreadable under a torch). Others carry no key.
-  const key = isKeyLevel(idx, isApex);
+  const key = tierKeySlot(idx, t, pos, isApex);
 
   return { pyramid, pos, size, monsters, wallDensity, traps, center, floor, dark: isApex, key };
 }
