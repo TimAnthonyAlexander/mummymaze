@@ -519,6 +519,12 @@ function SpawnRisers({
           // the normal monster layer. Applied to the whole turn wrapper (body +
           // 3D head), so both match the mirrored settled sprite.
           const facing = mirrorStyle(faceToward(m.pos, player));
+          // On a dark level the intro must obey the torch exactly like the
+          // settled monster layer does (see the `lit` gate there): an enemy
+          // outside the pool shows only its glowing eyes, never its body. The
+          // riser plane sits at z6, ABOVE the blackout at z5, so without this
+          // the whole cast is revealed in the dark for the length of the intro.
+          const lit = !level.dark || isLit(player, m.pos, level.dark.radius);
           const tileStyle = {
             transform: `translate(${m.pos.x * cell}px, ${m.pos.y * cell}px)`,
             '--rise-depth': `${depth}px`,
@@ -553,6 +559,18 @@ function SpawnRisers({
                     className="spawn-riser__sprite"
                     style={{ transform: `translate(${-nudgeX}px, ${-nudgeY}px)` }}
                   >
+                    {!lit ? (
+                      // Unlit: eyes only. The body subtree is not rendered at
+                      // all (rather than hidden) so SpawnMummyHeadTurn's
+                      // per-frame rAF never runs for an invisible enemy.
+                      <span className="spawn-riser__eyes" style={facing}>
+                        <span className="dark-eyes">
+                          <span className="dark-eye" />
+                          <span className="dark-eye" />
+                        </span>
+                      </span>
+                    ) : (
+                      <>
                     <span className="sprite__shadow" />
                     <span
                       className={`spawn-riser__turn${isMummy ? '' : turnActive}`}
@@ -585,6 +603,8 @@ function SpawnRisers({
                         </span>
                       )}
                     </span>
+                      </>
+                    )}
                   </span>
                 </span>
               </div>
@@ -726,12 +746,20 @@ export function Board({
   // View-only — the engine never sees this. Light is centred on the explorer's
   // current (animating) render position so the pool glides with the sprite.
   const dark = level.dark;
+  // The pool is a static gradient centred on an oversized child; we move it by
+  // TRANSFORM (compositor) instead of re-centring a gradient (full repaint every
+  // frame — see .board__dark in Board.css). So pass the offset from the board's
+  // centre, not the absolute light position.
   const lightStyle: CSSProperties | undefined = dark
     ? ({
-        '--light-x': `${(render.player.x + 0.5) * cell}px`,
-        '--light-y': `${(render.player.y + 0.5) * cell}px`,
-        '--light-r': `${dark.radius * cell}px`,
-        '--light-r2': `${(dark.radius + 1.1) * cell}px`,
+        '--light-tx': `${(render.player.x + 0.5) * cell - (cell * level.width) / 2}px`,
+        '--light-ty': `${(render.player.y + 0.5) * cell - (cell * level.height) / 2}px`,
+        // The pool must go FULLY dark exactly where `isLit` stops returning true
+        // (radius + 0.5), or the floor stays visible past the point where
+        // monsters have already dropped to the eyes-only fallback — you see the
+        // tile but not the enemy standing on it. These two numbers are one rule.
+        '--light-r': `${(dark.radius - 0.25) * cell}px`,
+        '--light-r2': `${(dark.radius + 0.5) * cell}px`,
         width: cell * level.width,
         height: cell * level.height,
       } as CSSProperties)
@@ -845,7 +873,9 @@ export function Board({
             beacon so the goal direction is always sensed through the dark. */}
         {dark && (
           <>
-            <div className="board__dark" style={lightStyle} />
+            <div className="board__dark" style={lightStyle}>
+              <div className="board__dark-pool" />
+            </div>
             <div
               className="exit-beacon"
               style={spriteStyle(level.exit.pos, cell)}

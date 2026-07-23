@@ -142,25 +142,31 @@
    AND walls — so the maze darkens into its surrounding stone at the edges rather
    than only the ground doing so. z-index 3 puts it above the walls (2) and below
    the exit (4), the dark-level torch overlay (5) and the sprites (6/7). `.board`
-   sets `isolation: isolate`, so the multiply is contained to the board and never
-   darkens the page behind it. Static layer — never re-renders on a sprite hop. */
+   sets `isolation: isolate`, so it is contained to the board and never darkens
+   the page behind it. Static layer — never re-renders on a sprite hop.
+
+   NOT `mix-blend-mode: multiply`, deliberately. A blend mode has to READ ITS
+   BACKDROP, which forces the layers beneath it to be re-rasterized together and
+   defeats the `translateZ(0)` compositor caching on `.board__walls` /
+   `.board__grid`. That caching is the only thing keeping the walls' stacked
+   box-shadows from repainting on every animation frame (see the 3 FPS note on
+   `.board__walls`). A plain warm-black alpha gradient composites without reading
+   anything and, over this palette, is visually near-identical. */
 .board__ao {
   position: absolute;
   top: 0;
   left: 0;
   pointer-events: none;
   z-index: 3;
-  mix-blend-mode: multiply;
-  /* Multiply factors: white = untouched centre, ~0.63 at the corners (a ~37%
-     brightness drop), warm-biased (blue falls furthest) so the edges go shadowed
-     sandstone rather than grey. */
+  /* Alpha equivalents of the multiply factors this replaced: untouched centre,
+     ~0.38 warm black at the corners (a ~37% brightness drop on this sandstone). */
   background: radial-gradient(
     58% 58% at 50% 46%,
-    #ffffff 0%,
-    #f8f4ed 35%,
-    #ddd2bc 62%,
-    #b9a98d 82%,
-    #9a8a6c 100%
+    rgba(26, 16, 5, 0) 0%,
+    rgba(26, 16, 5, 0.03) 35%,
+    rgba(26, 16, 5, 0.14) 62%,
+    rgba(26, 16, 5, 0.29) 82%,
+    rgba(26, 16, 5, 0.38) 100%
   );
 }
 .board__grain {
@@ -682,6 +688,16 @@
   position: absolute;
   inset: 0;
 }
+/* An unlit enemy during the spawn intro on a dark level: eyes only, centred in
+   the tile the way `.sprite--eyes` centres them on the settled monster layer
+   (`.spawn-riser__sprite` is a bare inset:0 box and does not centre). */
+.spawn-riser__eyes {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
 /* Hide the flat body-SVG head during the turn — the 3D head replaces it. */
 .spawn-riser__turn--active .sprite-head {
   opacity: 0;
@@ -895,25 +911,37 @@
    Sizing (width/height) and the light centre/radius come from inline vars set
    in Board.tsx. Registering --light-x/y as typed custom properties lets the
    pool GLIDE with the sprite (same 120ms linear timing) instead of jumping. */
-@property --light-x {
-  syntax: '<length>';
-  inherits: false;
-  initial-value: 0px;
-}
-@property --light-y {
-  syntax: '<length>';
-  inherits: false;
-  initial-value: 0px;
-}
-
+/* The torch is drawn ONCE and MOVED, never re-drawn.
+   It used to be a radial-gradient whose centre was two registered custom
+   properties (--light-x/--light-y) transitioned on every hop. That glides, but a
+   gradient driven by a changing custom property cannot be composited: each of
+   the ~7 frames repainted a full-board-sized gradient on the main thread, every
+   single step, which is the single most expensive thing on a dark level.
+   Now the pool is a static gradient on an oversized child that is TRANSLATED
+   into place, so the glide runs on the compositor and paints nothing. */
 .board__dark {
   position: absolute;
   top: 0;
   left: 0;
   pointer-events: none;
   z-index: 5;
+  /* Clips the oversized pool back to the play field. */
+  overflow: hidden;
+}
+
+/* 300% of the board, offset -100%, so its centre starts at the board's centre
+   and it still covers the field at the extremes of the translation (the pool
+   never travels further than half a board from centre). Outside --light-r2 the
+   gradient is solid, so the overhang is just more darkness. */
+.board__dark-pool {
+  position: absolute;
+  top: -100%;
+  left: -100%;
+  width: 300%;
+  height: 300%;
+  transform: translate(var(--light-tx), var(--light-ty));
   background: radial-gradient(
-    circle at var(--light-x) var(--light-y),
+    circle at 50% 50%,
     transparent 0,
     transparent var(--light-r),
     rgba(6, 5, 3, 0.72) calc((var(--light-r) + var(--light-r2)) / 2),
@@ -921,10 +949,9 @@
   );
 }
 @media (prefers-reduced-motion: no-preference) {
-  .board__dark {
-    transition:
-      --light-x 120ms linear,
-      --light-y 120ms linear;
+  .board__dark-pool {
+    transition: transform 120ms linear;
+    will-change: transform;
   }
 }
 
