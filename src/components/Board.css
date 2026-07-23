@@ -197,20 +197,43 @@
 /* Static circular ground shadow, pooled under the sprite. It never mirrors or
    rotates, so facing changes leave it (and the perspective) intact. */
 .sprite__shadow {
+  /* Per-character sizing hook. Set --sprite-shadow-scale on an individual sprite
+     element (a scorpion is smaller than a mummy and shouldn't pool the same blob)
+     to shrink/grow the whole pool. Intentionally NOT wired up anywhere yet —
+     the default of 1 reproduces the shared size. */
+  --sprite-shadow-scale: 1;
+  /* The whole game is lit from the TOP-LEFT (walls extrude down-right), so the
+     contact shadow is nudged down-right to agree. Kept small — a bigger offset
+     reads as the sprite sliding off its own tile. */
+  --sprite-shadow-dx: calc(var(--cell) * 0.045);
+  --sprite-shadow-dy: calc(var(--cell) * 0.022);
   position: absolute;
   left: 50%;
-  top: 66%;
-  width: 66%;
-  height: 28%;
-  transform: translateX(-50%);
+  /* Vertically centred on ~80% down the tile (where the FEET are, matching
+     .player-oval-ring), then offset by --sprite-shadow-dy. */
+  top: calc(80% - (26% * var(--sprite-shadow-scale)) / 2);
+  width: calc(62% * var(--sprite-shadow-scale));
+  height: calc(26% * var(--sprite-shadow-scale));
+  transform: translate(calc(-50% + var(--sprite-shadow-dx)), var(--sprite-shadow-dy));
   border-radius: 50%;
-  /* Larger, softer pre-baked blob — the main depth cue for the pre-rendered look. */
-  background: radial-gradient(
-    ellipse at center,
-    rgba(22, 14, 2, 0.5) 0%,
-    rgba(22, 14, 2, 0.34) 40%,
-    rgba(22, 14, 2, 0) 72%
-  );
+  /* Two stacked ellipses, the way a pre-render bakes contact shadow + ambient
+     occlusion: a small, dark, fast-falling CORE right under the feet, over a
+     wide, faint ambient pool. Both are radial-gradients (compositor-cheap) —
+     no blur/box-shadow, which would repaint every hop frame. */
+  background:
+    radial-gradient(
+      ellipse 40% 54% at 50% 50%,
+      rgba(12, 8, 1, 0.72) 0%,
+      rgba(12, 8, 1, 0.52) 46%,
+      rgba(12, 8, 1, 0.14) 80%,
+      rgba(12, 8, 1, 0) 100%
+    ),
+    radial-gradient(
+      ellipse at center,
+      rgba(22, 14, 2, 0.26) 0%,
+      rgba(22, 14, 2, 0.15) 48%,
+      rgba(22, 14, 2, 0) 78%
+    );
   z-index: 0;
   pointer-events: none;
 }
