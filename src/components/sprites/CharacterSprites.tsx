@@ -150,11 +150,6 @@ export function MummySprite({
       <path d="M18 27 Q24 22 32 22 Q40 22 46 27" fill="none" stroke={light} strokeWidth="1.6" strokeLinecap="round" opacity="0.7" />
       <path d="M40 22 Q46 23 46 28 L40 33 L38.5 44 Q35 46 32 46 Z" fill={shade} opacity="0.4" />
 
-      {/* ── neck + head; only the eyes show ── */}
-      <path d="M28.5 18 L35.5 18 L35 23 L29 23 Z" fill={shade} opacity="0.7" />
-      <ellipse cx="32" cy="12.5" rx="6.4" ry="7" fill={`url(#${gid})`} />
-      <path d="M33 6 Q38.4 8 38.4 12.5 Q38.4 17 34 19 Z" fill={shade} opacity="0.45" />
-
       {/* ── arms thrust straight FORWARD, hung off the SHOULDERS: foreshortened,
             so they are SHORT stubs pointing down in 2D, out at the shoulder line
             and ending in fists — well clear of the legs ── */}
@@ -187,20 +182,40 @@ export function MummySprite({
           <path d="M17.6 28 L24.4 28 M39.6 28 L46.4 28" />
           {/* legs */}
           <path d="M25 48 L32 49 M25 54 L32 55 M33 48 L40 49 M33 54 L40 55" />
-          {/* head */}
-          <path d="M26 9 Q32 11 38 9 M26.5 15.5 Q32 17.5 37.5 15.5" />
         </g>
         <g stroke={bandHi} strokeWidth="0.7" opacity="0.55">
           <path d="M20 30.2 Q32 33.2 44 30.2 M23 42.2 Q32 45.2 41 42.2" />
         </g>
       </g>
 
-      {/* ── glaring eyes through a shadowed slit ── */}
-      <path d="M26 12.5 Q32 10.8 38 12.5 Q37.6 16.4 32 16.8 Q26.4 16.4 26 12.5 Z" fill="#20160c" opacity="0.92" />
-      <circle cx="29.4" cy="13.3" r="1.8" fill={eye} />
-      <circle cx="34.6" cy="13.3" r="1.8" fill={eye} />
-      <circle cx="28.9" cy="12.8" r="0.7" fill="#fff7db" />
-      <circle cx="34.1" cy="12.8" r="0.7" fill="#fff7db" />
+      {/* ── head (neck + skull + wraps + eyes), grouped and drawn LAST so it is a
+            single isolated unit. The `.sprite-head` class lets the spawn intro
+            turn ONLY the head (a 180° twist), never the whole body — see
+            Board.css `spawn-headturn`. The head sits clear above the torso/arms,
+            so drawing it last does not change the normal appearance. Nothing
+            overlaps it, so a rotation stays self-contained. ── */}
+      <g className="sprite-head">
+        {/* neck */}
+        <path d="M28.5 18 L35.5 18 L35 23 L29 23 Z" fill={shade} opacity="0.7" />
+        {/* skull + shaded right side */}
+        <ellipse cx="32" cy="12.5" rx="6.4" ry="7" fill={`url(#${gid})`} />
+        <path d="M33 6 Q38.4 8 38.4 12.5 Q38.4 17 34 19 Z" fill={shade} opacity="0.45" />
+        {/* bandage wraps across the head */}
+        <path
+          d="M26 9 Q32 11 38 9 M26.5 15.5 Q32 17.5 37.5 15.5"
+          fill="none"
+          stroke={band}
+          strokeWidth="1.5"
+          opacity="0.85"
+          strokeLinecap="round"
+        />
+        {/* glaring eyes through a shadowed slit */}
+        <path d="M26 12.5 Q32 10.8 38 12.5 Q37.6 16.4 32 16.8 Q26.4 16.4 26 12.5 Z" fill="#20160c" opacity="0.92" />
+        <circle cx="29.4" cy="13.3" r="1.8" fill={eye} />
+        <circle cx="34.6" cy="13.3" r="1.8" fill={eye} />
+        <circle cx="28.9" cy="12.8" r="0.7" fill="#fff7db" />
+        <circle cx="34.1" cy="12.8" r="0.7" fill="#fff7db" />
+      </g>
     </svg>
   );
 }

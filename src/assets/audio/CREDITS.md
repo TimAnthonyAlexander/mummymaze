@@ -1,11 +1,13 @@
 # Audio credits
 
-All sound effects are **CC0 (public domain)** by **Kenney** — <https://kenney.nl>.
-No attribution is required; this credit is voluntary.
+Every sound is **copyright-free** (no attribution legally required). All clips
+were transcoded to mono MP3.
 
-Source packs: *RPG Audio*, *Impact Sounds*, *Interface Sounds*
-(<https://kenney.nl/assets>). Clips were transcoded to mono MP3.
+## Kenney — CC0 (public domain)
 
+Most effects are **CC0** by **Kenney** — <https://kenney.nl>. No attribution is
+required; this credit is voluntary. Source packs: *RPG Audio*, *Impact Sounds*,
+*Interface Sounds* (<https://kenney.nl/assets>).
 License: Creative Commons Zero (CC0 1.0) —
 <https://creativecommons.org/publicdomain/zero/1.0/>
 
@@ -20,12 +22,18 @@ License: Creative Commons Zero (CC0 1.0) —
 | `hint.mp3` | hint revealed | `glass_001` (Interface) |
 | `blocked.mp3` | blocked move / wait | `impactSoft_medium_000` (Impact) |
 
-## Synthesized voices (not samples)
+## Mixkit — Mixkit Free License
 
-Two spawn-intro stings are synthesized live in the Web Audio graph (`sound.ts`),
-so there is no file and nothing to license:
+| File | Event | Source |
+|------|-------|--------|
+| `scare.mp3` | spawn head-turn (the enemies' roar) | "Aggressive beast roar", Mixkit (<https://mixkit.co/free-sound-effects/monster/>) |
 
-- **rumble** — a low, filtered stone-grind as the enemy tiles rise out of the
-  floor (the "elevator" bed).
-- **scare** — a dissonant down-bending drone + noise riser + high metallic
-  shiver, fired as the risen enemies whip around to face the player.
+Mixkit Free License — royalty-free, no attribution required, commercial use OK,
+no payment: <https://mixkit.co/license/#sfxFree>. Trimmed to ~1.5s, loudness-
+normalized, short fade-out.
+
+## Synthesized (not a file)
+
+- **rumble** — a low, filtered stone-grind synthesized live in the Web Audio
+  graph (`sound.ts`) as the enemy tiles rise out of the floor. Nothing to
+  license; best-effort and silent without an audio context.

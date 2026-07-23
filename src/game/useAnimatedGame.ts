@@ -44,8 +44,8 @@ const SPAWN_REVEAL_MS = 380; // lights-on fade (must exceed the .board__spawn CS
 const MAX_SPAWN_HOPS = 4; // cap the walk-in so the intro stays snappy on wide boards
 // Enemy elevator + head-turn (must each exceed the matching Board.css animation).
 const SPAWN_PIT_HOLD_MS = 240; // beat with the empty pits showing before they rise
-const SPAWN_RISE_MS = 620; // tiles + enemies ride up out of the floor
-const SPAWN_TURN_MS = 600; // enemies whip around to face the player
+const SPAWN_RISE_MS = 1040; // tiles + enemies ride up out of the floor (slow, linear)
+const SPAWN_TURN_MS = 620; // the risen enemies' heads twist 180° and back
 
 interface Frame {
   dur: number;
