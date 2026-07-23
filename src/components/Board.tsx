@@ -817,24 +817,11 @@ export function Board({
     if (el) scorpionEls.current.set(id, el);
     else scorpionEls.current.delete(id);
   };
-  // Each scorpion's CONTINUOUS angle, which keeps accumulating past 360° instead
-  // of wrapping. Turning to the raw 0-360 value would take the long way round on
-  // a wrap (E=270° → S=0° would unwind three quarters of a circle); the running
-  // angle lets each turn pick the short way.
-  const scorpionAngles = useRef(new Map<string, number>());
-  const turnScorpion = (id: string, el: HTMLElement, facing: Facing8) => {
-    const target = SCORPION_FACING_DEG[facing];
-    const current = scorpionAngles.current.get(id);
-    if (current === undefined) {
-      // First sight of this scorpion: adopt the facing outright, no spin-in.
-      scorpionAngles.current.set(id, target);
-      el.style.transform = `rotate(${target}deg)`;
-      return;
-    }
-    const delta = (((target - current + 180) % 360) + 360) % 360 - 180;
-    const next = current + delta;
-    scorpionAngles.current.set(id, next);
-    el.style.transform = `rotate(${next}deg)`;
+  // The turn is a hard CUT to the new facing on a single frame — no tween, no
+  // short-way-round bookkeeping needed (see Board.css: a pre-rendered sprite of
+  // this era has baked facings and cuts between them).
+  const turnScorpion = (el: HTMLElement, facing: Facing8) => {
+    el.style.transform = `rotate(${SCORPION_FACING_DEG[facing]}deg)`;
   };
   // Facing rule, shared by both pursuers: while taking a step a monster looks the
   // way it WALKS (the step direction); once it has stopped it turns to face the
@@ -872,10 +859,10 @@ export function Board({
         const el = scorpionEls.current.get(m.id);
         if (el) {
           const stepped = anim && prev ? moveFacing(prev, m.pos) : null;
-          turnScorpion(m.id, el, stepped ?? mummyFacing(m.pos, render.player));
+          turnScorpion(el, stepped ?? mummyFacing(m.pos, render.player));
           if (stepped && anim) {
             const settled = mummyFacing(m.pos, render.player);
-            anim.onfinish = () => turnScorpion(m.id, el, settled);
+            anim.onfinish = () => turnScorpion(el, settled);
           }
         }
       }

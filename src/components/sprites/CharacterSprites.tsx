@@ -404,6 +404,10 @@ const SCORPION_VIEWBOX = '68 25 545 545';
  * the upright bipeds can only mirror (rotating a standing man lays him on his
  * side — see `mirrorStyle` in Board.tsx).
  *
+ * The turn is a hard CUT between these four angles on a single frame, never a
+ * tween — a pre-rendered sprite of this era has baked facings and no in-between
+ * art to ease through (see Board.css `.sprite--scorpion .sprite__body`).
+ *
  * The art points SOUTH (head and pincers down-screen). CSS `rotate` is
  * clockwise, and a clockwise quarter turn takes "down" to the WEST, so W = 90°.
  * The pivot is the element centre, which SCORPION_VIEWBOX already frames on the
