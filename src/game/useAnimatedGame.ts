@@ -45,6 +45,7 @@ const MAX_SPAWN_HOPS = 4; // cap the walk-in so the intro stays snappy on wide b
 // Enemy elevator + head-turn (must each exceed the matching Board.css animation).
 const SPAWN_PIT_HOLD_MS = 240; // beat with the empty pits showing before they rise
 const SPAWN_RISE_MS = 1040; // tiles + enemies ride up out of the floor (slow, linear)
+const SPAWN_TURN_DELAY_MS = 200; // beat after the rise settles before the head turns + roars
 const SPAWN_TURN_MS = 780; // the risen enemies' heads twist a full 360° on the neck
 
 interface Frame {
@@ -404,6 +405,9 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
       if (base.monsters.some((m) => m.alive)) {
         frames.push({ dur: SPAWN_PIT_HOLD_MS, apply: (r) => r });
         frames.push({ dur: SPAWN_RISE_MS, apply: (r) => ({ ...r, spawn: 'rise' }), sound: sfx.rumble });
+        // A short beat with the enemies risen and still, so the head-turn + roar
+        // don't tread on the tail of the stone-drag rise sound.
+        frames.push({ dur: SPAWN_TURN_DELAY_MS, apply: (r) => r });
         frames.push({ dur: SPAWN_TURN_MS, apply: (r) => ({ ...r, spawn: 'turn' }), sound: sfx.scare });
       }
       spawningRef.current = true;
