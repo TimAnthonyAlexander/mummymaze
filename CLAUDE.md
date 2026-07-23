@@ -248,14 +248,33 @@ no engine/mechanics changed. Key pieces:
   **spawn-in** intro (board starts black, explorer walks in from the right edge
   to its start tile, then lights come up — full reveal on lit levels, torch view
   on dark ones; then the **enemy elevator**: each enemy's start tile rises up out
-  of a dark pit carrying the enemy, and the risen enemies whip 180° around to
-  face the player with a scare sting — one-time per load, skippable, snaps when
-  animations off). The elevator is driven by a `SpawnPhase` machine
-  (`dark`→`reveal`→`rise`→`turn`, then null) on `RenderState`: the normal monster
-  layer is suppressed for every non-null phase and the enemies are drawn instead
-  by `SpawnRisers` (a per-enemy pit + rising slab + sprite, CSS `spawn-rise` /
-  `spawn-headturn`, clip-pathed at the tile floor line so slabs emerge from the
-  ground). The
+  of a dark pit carrying the enemy — a slow, LINEAR stone rise, no overshoot —
+  and the risen enemies' heads twist a full 360° to face the player with a scare
+  roar; one-time per load, skippable, snaps when animations off). Driven by a
+  `SpawnPhase` machine (`dark`→`reveal`→`rise`→`turn`, then null) on `RenderState`:
+  the normal monster layer is suppressed for every non-null phase and `SpawnRisers`
+  draws the enemies instead. **Read these design points before touching it — they
+  are all bugs already fixed:**
+  - **TWO planes per enemy** (not one): a floor plane (pit + rising slab) at
+    `z-index 1` BELOW the walls, so a wall bordering the tile is never blacked out
+    by the pit; and an enemy plane at `z-index 6` ABOVE the walls. Both share the
+    SAME `.spawn-riser__lift` `spawn-rise` animation, so they rise in lockstep.
+  - The rising slab is drawn **pixel-identically to a static `.cell`** (checker
+    parity `--a`/`--b`, 1px grid border, no fake-3D shadows) AND the floor plane is
+    pulled back 2px (`top/left: -2px`) to undo the overlay-vs-grid offset — else it
+    flashes the wrong floor / lands 2px down-right on hand-off.
+  - The enemy plane's bottom clip is raised (`--enemy-clip-bottom`, set per enemy)
+    ONLY when a horizontal wall sits on that tile's south edge (so the rising enemy
+    never covers the wall-top); otherwise 0, so the legs reach the floor.
+  - The enemy body carries the same facing mirror as the settled monster
+    (`mirrorStyle(faceToward(m.pos, player))`) so it doesn't flip L/R at hand-off.
+  - The head-turn is **`SpawnHead3D`** (CharacterSprites): the flat body-SVG head
+    (`.sprite-head`) is hidden and this overlays in its place — a round ball whose
+    front is pixel-identical to the flat head (no pop) while a per-frame rAF orbits
+    the eyes across its surface and brings the back of the head round (a real 3D
+    sphere turn; a flat SVG `rotateY` collapses to a line, which is wrong).
+  - No red "menace glow" — it read as a shadow that popped away on settle.
+  The
   **win-exit** walk; and a monster/player **crash** (loser squash-and-fade
   knockout + survivor recoil + a **gray smoke cloud + gold sparkles** with the
   merge sound, held so it finishes before the turn settles — also fired when the
