@@ -88,10 +88,14 @@
   right: 0;
 }
 
-/* The play field sits here, in a dark recessed groove so the frame reads raised. */
+/* The play field sits here, in a dark recessed groove so the frame reads raised.
+   z-index 4 puts it ABOVE the frieze bands (2) and corner rosettes (3): the exit
+   staircase is cut through the perimeter wall and reaches out past the board edge
+   into this groove, so the frame must not paint over it. The field and the
+   decorated bands never otherwise overlap, so nothing else changes. */
 .frame__inner {
   position: relative;
-  z-index: 1;
+  z-index: 4;
   border-radius: 4px;
   box-shadow:
     0 0 0 2px rgba(18, 11, 3, 0.75),

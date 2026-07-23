@@ -189,6 +189,10 @@ const segKey = (x: number, y: number) => `${x},${y}`;
  */
 const INNER_WALL_NUDGE = 9;
 
+/** Wall slab thickness as a fraction of a cell. Shared with the exit breach, whose
+ *  jamb stubs have to sit on the same band as the perimeter walls they butt into. */
+const WALL_THICK = 0.15;
+
 function wallStyle(
   seg: WallSeg,
   cell: number,
@@ -197,7 +201,7 @@ function wallStyle(
   cols: number,
   rows: number,
 ): CSSProperties {
-  const thick = cell * 0.15;
+  const thick = cell * WALL_THICK;
   const half = thick / 2;
   const onPerimeter =
     seg.orient === 'h' ? seg.y === 0 || seg.y === rows : seg.x === 0 || seg.x === cols;
@@ -308,15 +312,35 @@ const BoardWalls = memo(function BoardWalls({
   const hSet = new Set<string>();
   const vSet = new Set<string>();
   for (const s of walls) (s.orient === 'h' ? hSet : vSet).add(segKey(s.x, s.y));
+  // The exit's border segment is dropped entirely by computeWallSegments; these
+  // two stubs put back everything except the doorway itself, so the breach is a
+  // notch of a door's width in a continuous perimeter. They belong in THIS layer
+  // (all shadows, then all tops) or their cast shadow would streak the wall they
+  // continue — see exitJambs.
+  const jambs = exitJambs(level, cell);
+  // Trim anything that reaches ABOVE or LEFT of the perimeter's own outer face.
+  // INNER_WALL_NUDGE shifts interior walls up-left, so one touching the top or
+  // left edge sticks a stub out past the board — invisible while the ornate frame
+  // painted over the board, but the exit breach now reaches into that groove and
+  // the frame no longer covers it. The clip is asymmetric on purpose: the nudge
+  // only ever goes up-left, while every wall's extrusion and cast shadow run
+  // down-right and must stay.
+  const outerFace = (cell * WALL_THICK) / 2;
+  const clipStyle: CSSProperties = {
+    clipPath: `inset(${-outerFace}px ${-(cell * level.width + 80)}px ${-(cell * level.height + 80)}px ${-outerFace}px)`,
+  };
 
   return (
-    <div className="board__walls">
+    <div className="board__walls" style={clipStyle}>
       {walls.map((seg) => (
         <div
           key={`sh-${seg.orient}-${seg.x}-${seg.y}`}
           className="wall-shadow"
           style={wallStyle(seg, cell, hSet, vSet, level.width, level.height)}
         />
+      ))}
+      {jambs.map((style, i) => (
+        <div key={`jsh-${i}`} className="wall-shadow" style={style} />
       ))}
       {level.gates.map((g) =>
         gatesOpen[g.id] ? null : (
@@ -333,6 +357,9 @@ const BoardWalls = memo(function BoardWalls({
           className="wall-top"
           style={wallStyle(seg, cell, hSet, vSet, level.width, level.height)}
         />
+      ))}
+      {jambs.map((style, i) => (
+        <div key={`jtp-${i}`} className="wall-top" style={style} />
       ))}
       {level.gates.map((g) => {
         const seg = gateSeg(g);
@@ -914,63 +941,215 @@ export function Board({
 }
 
 /**
- * Draws a doorway gap in the border wall with a short outward passage and a
- * couple of steps. Authored in "north" orientation, then rotated to whichever
- * border the exit sits on.
+ * How far the breach reaches OUT past the board's border, in px. The stair has to
+ * leave the tile or the exit reads as furniture standing on the floor rather than
+ * a hole in the tomb wall. Scaled with the cell but hard-capped, because the room
+ * it reaches into is the ornate frame's groove — whose thickness is bounded (see
+ * BoardPane), not proportional to a cell.
+ */
+const EXIT_REACH_FRAC = 0.3;
+/** Hard ceiling in px. The groove the breach reaches into is the ornate frame,
+ *  whose thickness BoardPane caps at 42px, plus the board's own ~6px inset —
+ *  never reach past that or the flight spills onto the page. */
+const EXIT_REACH_MAX = 44;
+const exitReach = (cell: number) => Math.round(Math.min(cell * EXIT_REACH_FRAC, EXIT_REACH_MAX));
+
+/**
+ * Doorway width as a fraction of a cell. `computeWallSegments` drops the WHOLE
+ * border segment the exit crosses, so the rest of that edge is filled back in by
+ * `exitJambs` — the perimeter then reads as CUT THROUGH at a doorway's width,
+ * rather than simply missing for a whole tile.
+ */
+const EXIT_OPENING = 0.66;
+/** Treads in the descending flight. */
+const EXIT_STEPS = 5;
+/** Share of each step taken by its shadowed front riser; the rest is lit tread. */
+const EXIT_RISER_FRAC = 0.4;
+
+/**
+ * The two wall stubs that flank the doorway, in board coordinates.
+ *
+ * They are rendered by `BoardWalls`, NOT by `ExitOpening`, on purpose: the wall
+ * layer draws every shadow plane before every top plane, which is the only way
+ * connected stone merges instead of showing a seam where one slab's cast shadow
+ * lands on its neighbour's lit face. Drawn from the exit layer (a separate
+ * stacking context above the walls) they would streak a dark line across the
+ * perimeter they are supposed to continue.
+ *
+ * Each stub overlaps its neighbouring perimeter segment by half a thickness —
+ * the same leading overhang `wallStyle` gives every wall — so the two butt.
+ */
+function exitJambs(level: Level, cell: number): [CSSProperties, CSSProperties] {
+  const { exit } = level;
+  const thick = cell * WALL_THICK;
+  const half = thick / 2;
+  const openHalf = (cell * EXIT_OPENING) / 2;
+  const horiz = exit.dir === 'N' || exit.dir === 'S';
+  // The boundary line the exit cuts, and the tile index along that line.
+  const lineIndex = horiz
+    ? exit.dir === 'N'
+      ? exit.pos.y
+      : exit.pos.y + 1
+    : exit.dir === 'W'
+      ? exit.pos.x
+      : exit.pos.x + 1;
+  const alongIndex = horiz ? exit.pos.x : exit.pos.y;
+  const line = lineIndex * cell - half;
+  const start = alongIndex * cell - half;
+  const end = (alongIndex + 1) * cell + half;
+  const mid = (alongIndex + 0.5) * cell;
+  const a = { from: start, to: mid - openHalf };
+  const b = { from: mid + openHalf, to: end };
+  const box = (s: { from: number; to: number }): CSSProperties =>
+    horiz
+      ? { transform: `translate(${s.from}px, ${line}px)`, width: s.to - s.from, height: thick }
+      : { transform: `translate(${line}px, ${s.from}px)`, width: thick, height: s.to - s.from };
+  return [box(a), box(b)];
+}
+
+/**
+ * The exit: a staircase cut THROUGH the perimeter wall. The art is authored
+ * pointing north and rotated onto whichever border the exit sits on — the flight
+ * is symmetric about its own axis, so a rotation is correct for all four.
+ *
+ * The drawing box is padded by `exitReach` on every side so the flight can
+ * descend past the tile edge, across the gap `computeWallSegments` leaves in the
+ * perimeter, and out into the frame's groove. Bright treads sit against a dark
+ * shaft, with daylight bleeding in from beyond the mouth.
+ *
+ * Must stay `position: absolute` (`.exit-opening`) — in flow it shifts the static
+ * origin the absolutely-positioned sprites translate from, dropping sprites
+ * off-tile.
  */
 function ExitOpening({ pos, dir, cell }: { pos: Pos; dir: Dir; cell: number }) {
-  // Authored in "north" orientation (stairs descend toward the top border edge),
-  // then rotated onto whichever border the exit sits on. Stays WITHIN the tile so
-  // it never pokes into the ornate frame.
+  const pad = exitReach(cell);
+  const size = cell + pad * 2;
+  const c = size / 2;
   const deg = dir === 'N' ? 0 : dir === 'E' ? 90 : dir === 'S' ? 180 : 270;
-  const cx = cell / 2;
-  const gid = `exitglow-${pos.x}-${pos.y}`;
+  const shaftId = `exit-shaft-${pos.x}-${pos.y}`;
+  const glowId = `exit-glow-${pos.x}-${pos.y}`;
+  const aoId = `exit-ao-${pos.x}-${pos.y}`;
+  const sillId = `exit-sill-${pos.x}-${pos.y}`;
+  /** Half the perimeter wall's thickness — where the cut through it begins. */
+  const wallHalf = (cell * WALL_THICK) / 2;
 
-  // A descending staircase in false perspective: near steps low and wide, far
-  // steps high and narrow, each a lit top face over a shadowed front riser, with
-  // a dark opening beyond and a warm daylight glow bleeding in.
-  const N = 4;
-  const steps = Array.from({ length: N }, (_, i) => {
-    const t0 = i / N;
-    const t1 = (i + 1) / N;
-    const y = cell * (0.7 - 0.52 * t0); // top face y (higher = further out)
-    const yNext = cell * (0.7 - 0.52 * t1);
-    const halfW = cell * (0.36 - 0.12 * t0);
-    const riser = y - yNext; // front face height
-    const shade = 0.62 - 0.12 * i;
-    return { y, halfW, riser, top: `rgb(${216 - i * 10},${192 - i * 12},${138 - i * 12})`, front: `rgba(70,50,24,${shade})` };
+  // Authored north: the flight starts inside the tile and descends UP-screen,
+  // through the wall band at y = pad, and on out into the frame groove.
+  const openHalf = (cell * EXIT_OPENING) / 2;
+  const baseY = pad + cell * 0.46; // the bottom step's floor line, inside the tile
+  const mouthY = 2; // the outermost tread, just short of the box edge
+  const stepH = (baseY - mouthY) / EXIT_STEPS;
+  const riserH = stepH * EXIT_RISER_FRAC;
+
+  const steps = Array.from({ length: EXIT_STEPS }, (_, i) => {
+    const top = baseY - stepH * (i + 1); // far edge of this step's tread
+    const t = (i + 0.5) / EXIT_STEPS; // 0 = nearest, 1 = out in the daylight
+    // False perspective: the flight narrows as it recedes.
+    const halfW = openHalf * (1 - 0.34 * t);
+    // Treads brighten with distance — they are the ones catching the daylight.
+    const lit = Math.round(192 + 46 * t);
+    return { top, halfW, tread: `rgb(${lit},${lit - 20},${lit - 62})` };
   });
 
   return (
     <svg
       className="exit-opening"
-      width={cell}
-      height={cell}
-      viewBox={`0 0 ${cell} ${cell}`}
-      style={spriteStyle(pos, cell)}
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      style={{ transform: `translate(${pos.x * cell - pad}px, ${pos.y * cell - pad}px)` }}
+      aria-hidden="true"
     >
       <defs>
-        <radialGradient id={gid} cx="50%" cy="18%" r="70%">
-          <stop offset="0%" stopColor="rgba(255,244,206,0.9)" />
-          <stop offset="45%" stopColor="rgba(246,222,150,0.5)" />
+        {/* The shaft: warm daylight at the far mouth, pitch dark where the
+            passage runs under the thickness of the wall. */}
+        <linearGradient id={shaftId} x1="0" y1={mouthY} x2="0" y2={baseY} gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#8a6c33" />
+          <stop offset="0.24" stopColor="#33260f" />
+          <stop offset="0.5" stopColor="#150e05" />
+          <stop offset="1" stopColor="#1d1408" />
+        </linearGradient>
+        <radialGradient id={glowId} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="rgba(255,243,205,0.7)" />
+          <stop offset="50%" stopColor="rgba(246,222,150,0.3)" />
           <stop offset="100%" stopColor="rgba(246,222,150,0)" />
         </radialGradient>
+        {/* Shade cast down the passage by the wall it is cut through. */}
+        <linearGradient
+          id={aoId}
+          x1="0"
+          y1={pad - wallHalf * 3}
+          x2="0"
+          y2={pad + wallHalf * 3}
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0" stopColor="rgba(24,14,3,0)" />
+          <stop offset="0.44" stopColor="rgba(24,14,3,0.4)" />
+          <stop offset="0.64" stopColor="rgba(24,14,3,0.34)" />
+          <stop offset="1" stopColor="rgba(24,14,3,0)" />
+        </linearGradient>
+        {/* Contact shadow on the floor at the head of the flight. */}
+        <linearGradient id={sillId} x1="0" y1={baseY} x2="0" y2={baseY + cell * 0.11} gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="rgba(22,14,5,0.5)" />
+          <stop offset="1" stopColor="rgba(22,14,5,0)" />
+        </linearGradient>
       </defs>
-      <g transform={`rotate(${deg} ${cx} ${cx})`}>
-        {/* warm daylight glow from beyond the opening */}
-        <rect x={0} y={0} width={cell} height={cell * 0.7} fill={`url(#${gid})`} />
-        {/* dark opening beyond the top step */}
-        <rect x={cx - cell * 0.24} y={0} width={cell * 0.48} height={cell * 0.2} fill="#1c1309" />
-        {/* receding steps, far (top) first so nearer steps overlap correctly */}
+      <g transform={`rotate(${deg} ${c} ${c})`}>
+        {/* The dark shaft the treads sit in. Held at the FULL doorway width all
+            the way out, so the tapering flight never exposes the frame stone
+            through the sliver between a tread and its jamb. */}
+        <rect x={c - openHalf} y={0} width={openHalf * 2} height={baseY} fill={`url(#${shaftId})`} />
+        {/* Receding steps: each a lit tread with its shadowed riser below (nearer)
+            it. Far first, so every nearer step overlaps the one behind. */}
         {steps
           .slice()
           .reverse()
-          .map((s, idx) => (
-            <g key={idx}>
-              <rect x={cx - s.halfW} y={s.y} width={s.halfW * 2} height={s.riser + 1} fill={s.front} />
-              <rect x={cx - s.halfW} y={s.y - cell * 0.045} width={s.halfW * 2} height={cell * 0.05} fill={s.top} />
+          .map((s, i) => (
+            <g key={i}>
+              <rect
+                x={c - s.halfW}
+                y={s.top + stepH - riserH}
+                width={s.halfW * 2}
+                height={riserH + 0.5}
+                fill="rgba(30,20,8,0.82)"
+              />
+              <rect
+                x={c - s.halfW}
+                y={s.top}
+                width={s.halfW * 2}
+                height={stepH - riserH + 0.5}
+                fill={s.tread}
+              />
             </g>
           ))}
+        {/* The stone the passage is cut through, shading the treads that run
+            under it. A band exactly as deep as the wall, falling off both ways —
+            this is what separates "a flight through a breach" from "a plate laid
+            on top of the wall". */}
+        <rect
+          x={c - openHalf}
+          y={pad - wallHalf * 3}
+          width={openHalf * 2}
+          height={wallHalf * 6}
+          fill={`url(#${aoId})`}
+        />
+        {/* Contact shadow where the top step meets the floor, so the flight is
+            seated in the ground rather than resting on it. */}
+        <rect
+          x={c - openHalf}
+          y={baseY}
+          width={openHalf * 2}
+          height={cell * 0.11}
+          fill={`url(#${sillId})`}
+        />
+        {/* Daylight bleeding in from beyond the mouth — the "way out" signal. */}
+        <rect
+          x={c - openHalf * 1.15}
+          y={mouthY - openHalf * 1.15}
+          width={openHalf * 2.3}
+          height={openHalf * 2.3}
+          fill={`url(#${glowId})`}
+        />
       </g>
     </svg>
   );
