@@ -12,6 +12,8 @@
  */
 
 import { memo, useEffect, useRef } from 'react';
+import type { CSSProperties } from 'react';
+import type { Facing8 } from './MummySheet';
 
 interface SpriteProps {
   size?: number;
@@ -395,6 +397,34 @@ const SCORPION_LEGS: ReadonlyArray<readonly [string, string]> = [
  * Board.css raises that shadow from the biped foot line to meet the body here.
  */
 const SCORPION_VIEWBOX = '68 25 545 545';
+
+/**
+ * The scorpion is the one member of the cast that ROTATES to face its target
+ * instead of mirroring. It is drawn TOP-DOWN, so a real turn is the honest read;
+ * the upright bipeds can only mirror (rotating a standing man lays him on his
+ * side — see `mirrorStyle` in Board.tsx).
+ *
+ * The art points SOUTH (head and pincers down-screen). CSS `rotate` is
+ * clockwise, and a clockwise quarter turn takes "down" to the WEST, so W = 90°.
+ * The pivot is the element centre, which SCORPION_VIEWBOX already frames on the
+ * creature's body core — so a turn spins in place instead of swinging the body
+ * off its own contact shadow.
+ */
+export const SCORPION_FACING_DEG: Record<Facing8, number> = {
+  S: 0,
+  SW: 45,
+  W: 90,
+  NW: 135,
+  N: 180,
+  NE: 225,
+  E: 270,
+  SE: 315,
+};
+
+/** The scorpion's facing as a ready-made CSS transform. */
+export function scorpionFacingStyle(facing: Facing8): CSSProperties {
+  return { transform: `rotate(${SCORPION_FACING_DEG[facing]}deg)` };
+}
 
 /** Speckle on the mesosoma plates — flat carved dots, not a texture. */
 const SCORPION_SPECKS: ReadonlyArray<readonly [number, number]> = [

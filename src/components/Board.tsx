@@ -15,7 +15,12 @@ import { eyeLevel, lightLevel } from '../game/flashlight';
 import type { RenderState } from '../game/render';
 import { boardTextures } from '../game/textures';
 import { BoardAnnotations } from './BoardAnnotations';
-import { ExplorerSprite, MonsterSprite } from './sprites/CharacterSprites';
+import {
+  ExplorerSprite,
+  MonsterSprite,
+  SCORPION_FACING_DEG,
+  scorpionFacingStyle,
+} from './sprites/CharacterSprites';
 import {
   MummySheet,
   SpawnMummyHeadTurn,
@@ -514,11 +519,12 @@ function SpawnRisers({
           // (BoardFloor: (x+y) even = floor A, odd = floor B), or it flashes the
           // wrong floor colour until the intro settles into the real cell.
           const blockKind = (m.pos.x + m.pos.y) % 2 === 0 ? 'a' : 'b';
-          // Face the player exactly as the settled monster will (mirrorStyle +
-          // faceToward), so the body doesn't flip L/R when the intro hands off to
-          // the normal monster layer. Applied to the whole turn wrapper (body +
-          // 3D head), so both match the mirrored settled sprite.
+          // Face the player exactly as the settled monster will, so nothing
+          // flips or spins when the intro hands off to the normal monster layer:
+          // the glowing dark-level eyes mirror, and the top-down scorpion body
+          // takes the same rotation `turnScorpion` will settle it on.
           const facing = mirrorStyle(faceToward(m.pos, player));
+          const scorpionFacing = scorpionFacingStyle(mummyFacing(m.pos, player));
           // On a dark level the intro obeys the torch exactly like the settled
           // monster layer does: the body is always rendered but faded by the
           // falloff, and the eyes fade in as its inverse. The riser plane sits
@@ -575,7 +581,7 @@ function SpawnRisers({
                     <span className="sprite__shadow" />
                     <span
                       className={`spawn-riser__turn${isMummy ? '' : turnActive}`}
-                      style={isMummy ? undefined : facing}
+                      style={isMummy ? undefined : scorpionFacing}
                     >
                       {isMummy ? (
                         // The new mummy is the baked sheet. During 'turn' it plays
@@ -801,22 +807,53 @@ export function Board({
     if (el) mummyEls.current.set(id, el);
     else mummyEls.current.delete(id);
   };
-  // Facing rule: while taking a step the mummy looks the way it WALKS (the step
-  // direction); once it has stopped it turns to face the PLAYER. So mid-hop =
-  // step direction (prev → cur), settled = toward the player.
-  const currentMummyFacing = (m: RenderState['monsters'][number]): Facing8 => {
+  // The scorpion's body element (per monster). Unlike the mummy — which has a
+  // baked facing per sheet row — the scorpion is a top-down SVG that really
+  // ROTATES, and that rotation is driven imperatively here (never as a React
+  // style prop) so the settle-to-face-the-player turn can fire off the hop's own
+  // animation without a re-render.
+  const scorpionEls = useRef(new Map<string, HTMLElement>());
+  const setScorpionEl = (id: string) => (el: HTMLElement | null) => {
+    if (el) scorpionEls.current.set(id, el);
+    else scorpionEls.current.delete(id);
+  };
+  // Each scorpion's CONTINUOUS angle, which keeps accumulating past 360° instead
+  // of wrapping. Turning to the raw 0-360 value would take the long way round on
+  // a wrap (E=270° → S=0° would unwind three quarters of a circle); the running
+  // angle lets each turn pick the short way.
+  const scorpionAngles = useRef(new Map<string, number>());
+  const turnScorpion = (id: string, el: HTMLElement, facing: Facing8) => {
+    const target = SCORPION_FACING_DEG[facing];
+    const current = scorpionAngles.current.get(id);
+    if (current === undefined) {
+      // First sight of this scorpion: adopt the facing outright, no spin-in.
+      scorpionAngles.current.set(id, target);
+      el.style.transform = `rotate(${target}deg)`;
+      return;
+    }
+    const delta = (((target - current + 180) % 360) + 360) % 360 - 180;
+    const next = current + delta;
+    scorpionAngles.current.set(id, next);
+    el.style.transform = `rotate(${next}deg)`;
+  };
+  // Facing rule, shared by both pursuers: while taking a step a monster looks the
+  // way it WALKS (the step direction); once it has stopped it turns to face the
+  // PLAYER. So mid-hop = step direction (prev → cur), settled = toward the player.
+  const currentMonsterFacing = (m: RenderState['monsters'][number]): Facing8 => {
     const prev = prevPos.current.get(m.id);
     const stepped = prev ? moveFacing(prev, m.pos) : null;
     return stepped ?? mummyFacing(m.pos, render.player);
   };
   useLayoutEffect(() => {
-    const hop = (id: string, pos: Pos, dur: number) => {
+    // Returns the hop's Animation so a caller can hang settle-time work (the
+    // turn toward the player) off its finish; null when nothing was animated.
+    const hop = (id: string, pos: Pos, dur: number): Animation | null => {
       const el = spriteEls.current.get(id);
       const prev = prevPos.current.get(id);
       prevPos.current.set(id, pos);
-      if (!el || !prev || typeof el.animate !== 'function') return;
-      if (Math.abs(pos.x - prev.x) + Math.abs(pos.y - prev.y) !== 1) return; // snap, don't animate
-      el.animate(
+      if (!el || !prev || typeof el.animate !== 'function') return null;
+      if (Math.abs(pos.x - prev.x) + Math.abs(pos.y - prev.y) !== 1) return null; // snap, don't animate
+      return el.animate(
         [{ transform: charTranslate(prev, cell) }, { transform: charTranslate(pos, cell) }],
         { duration: dur, easing: HOP_EASING },
       );
@@ -826,7 +863,22 @@ export function Board({
     for (const m of render.monsters) {
       if (!m.alive) continue;
       const prev = prevPos.current.get(m.id); // capture BEFORE hop() overwrites it
-      hop(m.id, m.pos, MONSTER_ANIM_MS);
+      const anim = hop(m.id, m.pos, MONSTER_ANIM_MS);
+      // The scorpion turns rather than mirrors (top-down art). Same two-beat rule
+      // as the mummy: swing to the step direction as it sets off, then turn to
+      // face the player once the hop lands. A move it can't animate (undo,
+      // restart, an animations-off snap) skips straight to facing the player.
+      if (!isMummyKind(m.kind)) {
+        const el = scorpionEls.current.get(m.id);
+        if (el) {
+          const stepped = anim && prev ? moveFacing(prev, m.pos) : null;
+          turnScorpion(m.id, el, stepped ?? mummyFacing(m.pos, render.player));
+          if (stepped && anim) {
+            const settled = mummyFacing(m.pos, render.player);
+            anim.onfinish = () => turnScorpion(m.id, el, settled);
+          }
+        }
+      }
       // A mummy that actually stepped plays its walk cycle: cycle the sheet's
       // walk-frame columns (steps) over the hop, in the row for its facing.
       if (isMummyKind(m.kind) && prev && Math.abs(m.pos.x - prev.x) + Math.abs(m.pos.y - prev.y) === 1) {
@@ -953,12 +1005,15 @@ export function Board({
                         <MummySheet
                           ref={setMummyEl(m.id)}
                           variant={mummyVariant(m.kind)}
-                          facing={currentMummyFacing(m)}
+                          facing={currentMonsterFacing(m)}
                           size={mummySize}
                         />
                       </span>
                     ) : (
-                      <span className="sprite__body" style={facing}>
+                      // No `style` here ON PURPOSE: the rotation is owned by the
+                      // layout effect (turnScorpion), and a React-managed style
+                      // would clobber it on the next render.
+                      <span className="sprite__body" ref={setScorpionEl(m.id)}>
                         <MonsterSprite kind={m.kind} size={charSize} />
                       </span>
                     )}

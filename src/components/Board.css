@@ -274,6 +274,19 @@
   z-index: 1;
 }
 
+/* The scorpion is top-down, so it TURNS instead of mirroring: Board drives a
+   rotation on this element (step direction as it sets off, then round to face
+   the player as the hop lands). Transitioning it makes that a visible pivot
+   rather than a snap. Quicker than the hop so the turn leads the movement, the
+   way a real thing swings its body before it travels. Safe alongside the WAAPI
+   hop — that animates the OUTER .sprite's translate; this is an inner element
+   and the two never touch the same transform. */
+@media (prefers-reduced-motion: no-preference) {
+  .sprite--scorpion .sprite__body {
+    transition: transform 200ms ease-out;
+  }
+}
+
 /* Crash-effect wrapper around a monster's shadow + body. Normally inert; the
    collision animations live HERE (not on the outer .sprite, which owns the
    position transform, nor on .sprite__body, which owns the facing mirror) so the
