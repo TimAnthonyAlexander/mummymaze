@@ -595,6 +595,85 @@ function SpawnRisers({
   );
 }
 
+/**
+ * The trapdoor death on a skull tile — the exact inverse of the spawn elevator,
+ * and split into the same TWO planes for the same reason:
+ *
+ * • `.trapdoor-floor` (z1, BELOW the walls): the dark shaft plus the two leaves
+ *   that swing down into it. Under the walls, so a wall bordering this tile is
+ *   never blacked out by the hole.
+ * • `.trapdoor-faller` (z7, with the player): the explorer dropping through,
+ *   clipped to the hatch aperture so he disappears INTO the hole rather than
+ *   sliding over the floor around it.
+ *
+ * Each leaf carries a full-tile "face" — the same floor texture and the same
+ * `TrapDecal` the settled tile shows — clipped to that leaf's half. At rest the
+ * pair is therefore pixel-identical to the closed tile, so the skull pit simply
+ * splits in two and drops away with no pop when the hatch gives way.
+ */
+function Trapdoor({
+  fx,
+  cell,
+  markerSize,
+}: {
+  fx: NonNullable<RenderState['trapdoor']>;
+  cell: number;
+  markerSize: number;
+}) {
+  const { pos, phase } = fx;
+  // The leaves sit on the floor, so they must match the tile's checker parity
+  // (BoardFloor: (x+y) even = floor A) or the hatch flashes the wrong stone.
+  const parity = (pos.x + pos.y) % 2 === 0 ? 'a' : 'b';
+  const leafState = phase === 'open' ? 'swing' : 'open';
+  const style: CSSProperties = { transform: `translate(${pos.x * cell}px, ${pos.y * cell}px)` };
+  return (
+    <div className="trapdoor-floor" style={style} aria-hidden="true">
+      <span className="trapdoor__shaft" />
+      {(['l', 'r'] as const).map((side) => (
+        <span
+          key={side}
+          className={`trapdoor__leaf trapdoor__leaf--${side} trapdoor__leaf--${leafState}`}
+        >
+          <span className={`trapdoor__face trapdoor__face--${parity}`}>
+            <TrapDecal className="cell__marker" size={markerSize} />
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The explorer dropping through an open trapdoor, clipped to the hatch. */
+function TrapFaller({
+  pos,
+  facing,
+  cell,
+  charSize,
+}: {
+  pos: Pos;
+  facing: Dir;
+  cell: number;
+  charSize: number;
+}) {
+  const nudgeX = cell * 0.03;
+  const nudgeY = cell * 0.07;
+  return (
+    <div className="trapdoor-faller" style={spriteStyle(pos, cell)} aria-hidden="true">
+      <span className="trapdoor-faller__drop">
+        <span
+          className="trapdoor-faller__sprite"
+          style={{ transform: `translate(${-nudgeX}px, ${-nudgeY}px)` }}
+        >
+          {/* No ground shadow: the ground is what just gave way. */}
+          <span className="sprite__body" style={mirrorStyle(facing)}>
+            <ExplorerSprite size={charSize} />
+          </span>
+        </span>
+      </span>
+    </div>
+  );
+}
+
 interface BoardProps {
   level: Level;
   render: RenderState;
@@ -755,6 +834,12 @@ export function Board({
         <BoardStaticOverlay level={level} cell={cell} />
         <BoardWalls level={level} cell={cell} gatesOpen={render.gatesOpen} />
 
+        {/* Trapdoor death: the floor plane (shaft + swinging leaves) sits BELOW
+            the walls, so the hole never blacks out a wall on this tile's edge. */}
+        {render.trapdoor && (
+          <Trapdoor fx={render.trapdoor} cell={cell} markerSize={markerSize} />
+        )}
+
         {/* Dark levels: black torchlight overlay above walls/exit, below sprites,
             with a soft circular hole tracking the explorer. Plus a faint exit
             beacon so the goal direction is always sensed through the dark. */}
@@ -881,6 +966,19 @@ export function Board({
             <ExplorerSprite size={charSize} />
           </span>
         </div>
+
+        {/* The explorer falling through the open trapdoor. Drawn in the player's
+            own plane (above the walls and the dark overlay) but clipped to the
+            hatch, so he vanishes into the shaft. The normal player sprite is
+            faded out for the drop (see useAnimatedGame). */}
+        {render.trapdoor?.phase === 'fall' && (
+          <TrapFaller
+            pos={render.trapdoor.pos}
+            facing={render.playerFacing}
+            cell={cell}
+            charSize={charSize}
+          />
+        )}
 
         {/* Enemy elevator: on every spawn phase after the curtain lifts, the
             enemies ride up out of the floor on their own tiles and then whip

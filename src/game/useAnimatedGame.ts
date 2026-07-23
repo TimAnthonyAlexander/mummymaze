@@ -55,6 +55,14 @@ const SPAWN_RISE_MS = 1040; // tiles + enemies ride up out of the floor (slow, l
 const SPAWN_TURN_DELAY_MS = 200; // beat after the rise settles before the head turns + roars
 const SPAWN_TURN_MS = 780; // the risen enemies' heads twist a full 360° on the neck
 
+// Trapdoor death on a skull tile — the inverse of the spawn elevator. Each hold
+// slightly exceeds its matching Board.css animation so a phase finishes and rests
+// before the next one starts. The beat of silence while the leaves give way is
+// deliberate: the scream lands on the drop, not on the crack.
+const TRAP_OPEN_MS = 300; // the two leaves swing down under the explorer
+const TRAP_FALL_MS = 640; // he drops through the hole into the dark
+const TRAP_HOLD_MS = 300; // a beat on the empty shaft before the lose panel covers it
+
 interface Frame {
   dur: number;
   apply: (r: RenderState) => RenderState;
@@ -239,6 +247,26 @@ function buildFrames(
     frames.push({ dur: CRASH_HOLD_MS, apply: (r) => r });
   }
   return frames;
+}
+
+/**
+ * The trapdoor death, appended after the turn's own frames: the leaves swing
+ * open, the explorer falls through, then the empty shaft is held. The engine
+ * kills on a trap BEFORE the monster phase, so the turn itself is only the
+ * player's own hop and this always plays last.
+ */
+function trapFallFrames(pos: Pos): Frame[] {
+  return [
+    { dur: TRAP_OPEN_MS, apply: (r) => ({ ...r, trapdoor: { pos, phase: 'open' } }) },
+    {
+      dur: TRAP_FALL_MS,
+      // The falling explorer is drawn by the trapdoor layer (clipped to the
+      // shaft so he vanishes into it), so the normal sprite hides for the drop.
+      apply: (r) => ({ ...r, trapdoor: { pos, phase: 'fall' }, playerOpacity: 0 }),
+      sound: sfx.scream,
+    },
+    { dur: TRAP_HOLD_MS, apply: (r) => ({ ...r, trapdoor: { pos, phase: 'gone' } }) },
+  ];
 }
 
 /**
@@ -457,20 +485,39 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
       if (action !== 'wait') playerFacingRef.current = action as Dir;
       const facing = playerFacingRef.current;
       const exited = trace.some((e) => e.kind === 'exit');
+      // A trap death carries no trace event of its own — the committed state's
+      // lossReason is the signal, so the engine stays untouched.
+      const trapLoss = next.phase === 'lost' && next.lossReason === 'trap';
+      const animate = animationsEnabled();
+      // The fall is a big vertical motion: skip it (but keep the scream) when the
+      // player asked for reduced motion or turned animations off.
+      const trapFall = trapLoss && animate && !prefersReducedMotion();
       const startRender: RenderState = { ...toRender(present), playerFacing: facing };
       const finalRender: RenderState = {
         ...toRender(next),
         playerFacing: facing,
-        playerOpacity: exited ? 0 : 1,
+        // He fell through the floor: the settled board keeps the hole open and the
+        // explorer gone, so the lose panel arrives over the aftermath.
+        playerOpacity: exited || trapFall ? 0 : 1,
+        trapdoor: trapFall ? { pos: next.player, phase: 'gone' } : null,
       };
       const settle = settleSound(next.phase);
+      // Without the fall the scream has no frame to ride on, so it settles with
+      // the lose thud instead.
+      const settleAll =
+        trapLoss && !trapFall
+          ? () => {
+              sfx.scream();
+              settle?.();
+            }
+          : settle;
 
-      if (!animationsEnabled()) {
+      if (!animate) {
         // Snap straight to the settled state; sprites still glide via CSS.
         snap(next);
         setRender(finalRender);
         fireInstantSounds(trace);
-        settle?.();
+        settleAll?.();
         return;
       }
       // A monster catching the player (or the player walking onto one) is a crash
@@ -483,7 +530,9 @@ export function useAnimatedGame(level: Level): UseAnimatedGame {
       const mummyIds = new Set(
         present.monsters.filter((m) => m.kind.startsWith('mummy')).map((m) => m.id),
       );
-      play(buildFrames(trace, { playerCrashTile, mummyIds }), startRender, finalRender, settle);
+      const turnFrames = buildFrames(trace, { playerCrashTile, mummyIds });
+      const frames = trapFall ? [...turnFrames, ...trapFallFrames(next.player)] : turnFrames;
+      play(frames, startRender, finalRender, settleAll);
     },
     [play, snap, finishSpawn],
   );

@@ -39,6 +39,22 @@ export interface CrashPuff {
  */
 export type SpawnPhase = 'dark' | 'reveal' | 'rise' | 'turn';
 
+/**
+ * The trapdoor death on a skull tile — the inverse of the spawn-in elevator:
+ * instead of an enemy riding up out of a pit, the floor gives way under the
+ * explorer and he drops into it.
+ *   'open' — the two leaves swing down; the explorer is still standing on them.
+ *   'fall' — the explorer drops through the open hole into the dark.
+ *   'gone' — he is gone; the empty shaft is held open under the lose panel.
+ * `null` whenever no trapdoor is open (every settled snapshot).
+ */
+export type TrapdoorPhase = 'open' | 'fall' | 'gone';
+
+export interface TrapdoorFx {
+  readonly pos: Pos;
+  readonly phase: TrapdoorPhase;
+}
+
 export interface RenderState {
   readonly player: Pos;
   /** Direction the explorer sprite faces (its last move); defaults to south. */
@@ -51,6 +67,8 @@ export interface RenderState {
   readonly puffs: readonly CrashPuff[];
   /** Spawn intro overlay phase, or null when not intro-ing (a settled board). */
   readonly spawn: SpawnPhase | null;
+  /** Open trapdoor + falling explorer (view-only; null on a settled snapshot). */
+  readonly trapdoor: TrapdoorFx | null;
 }
 
 /** Snapshot a committed engine state into a render state (all sprites settled). */
@@ -68,5 +86,6 @@ export function toRender(s: GameState): RenderState {
     gatesOpen: { ...s.gatesOpen },
     puffs: [],
     spawn: null,
+    trapdoor: null,
   };
 }

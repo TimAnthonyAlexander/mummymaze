@@ -23,6 +23,7 @@ import monster2 from '../assets/audio/monster2.mp3';
 import monster3 from '../assets/audio/monster3.mp3';
 import rumbleUrl from '../assets/audio/rumble.mp3';
 import scareUrl from '../assets/audio/scare.mp3';
+import screamUrl from '../assets/audio/scream.mp3';
 import step1 from '../assets/audio/step1.mp3';
 import step2 from '../assets/audio/step2.mp3';
 import step3 from '../assets/audio/step3.mp3';
@@ -176,6 +177,7 @@ const SAMPLES = {
   hint: [hintUrl],
   rumble: [rumbleUrl],
   scare: [scareUrl],
+  scream: [screamUrl],
 } as const;
 
 const ALL_URLS = [...new Set(Object.values(SAMPLES).flat())];
@@ -346,6 +348,9 @@ export const sfx = {
   /** Spawn intro: the aggressive beast roar as the risen enemies turn their
    *  heads to face the player (CC-free Mixkit sample). */
   scare: () => play(() => playSample(SAMPLES.scare, { gain: 0.95 })),
+  /** The explorer dropping through a trapdoor: a falling scream. Mixed a touch
+   *  under the lose thud that follows it, so the two don't stack into a spike. */
+  scream: () => play(() => playSample(SAMPLES.scream, { gain: 0.6 })),
 };
 
 /** Test-only seam: reset cached state between cases. */

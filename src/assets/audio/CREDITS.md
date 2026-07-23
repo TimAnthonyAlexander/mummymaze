@@ -31,10 +31,14 @@ License: Creative Commons Zero (CC0 1.0) —
 | File | Event | Source |
 |------|-------|--------|
 | `scare.mp3` | spawn head-turn (the enemies' roar) | "Aggressive beast roar", Mixkit (<https://mixkit.co/free-sound-effects/monster/>) |
+| `scream.mp3` | trapdoor death (the explorer falling) | "Falling male scream", Mixkit item 391 (<https://mixkit.co/free-sound-effects/scream/>, <https://assets.mixkit.co/active_storage/sfx/391/391-preview.mp3>) |
 
 Mixkit Free License — royalty-free, no attribution required, commercial use OK,
 no payment: <https://mixkit.co/license/#sfxFree>. Trimmed to ~1.5s, loudness-
 normalized, short fade-out.
+
+`scream.mp3`: first 1.35s of the source, mono, 64 kbps, −9 dB, 0.25s fade-out —
+mixed to sit just under the `lose.mp3` thud that follows it.
 
 ## User-supplied — licence UNVERIFIED
 
