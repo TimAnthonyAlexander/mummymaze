@@ -181,22 +181,34 @@ const segKey = (x: number, y: number) => `${x},${y}`;
  * extension lands on the adjoining wall (never open floor), closing the square
  * corner gap that otherwise appears where two trailing ends meet (e.g. a
  * bottom-right corner). `hSet`/`vSet` hold every drawn wall segment.
+ *
+ * INTERIOR walls are additionally nudged up-left by `INNER_WALL_NUDGE`. The
+ * board perimeter is NOT nudged — it has to stay seated in the frame's groove.
+ * Both planes (shadow and top) go through this function, so they move together
+ * and connected runs still merge.
  */
+const INNER_WALL_NUDGE = 9;
+
 function wallStyle(
   seg: WallSeg,
   cell: number,
   hSet: Set<string>,
   vSet: Set<string>,
+  cols: number,
+  rows: number,
 ): CSSProperties {
   const thick = cell * 0.15;
   const half = thick / 2;
+  const onPerimeter =
+    seg.orient === 'h' ? seg.y === 0 || seg.y === rows : seg.x === 0 || seg.x === cols;
+  const nudge = onPerimeter ? 0 : INNER_WALL_NUDGE;
   if (seg.orient === 'h') {
     const { x, y } = seg;
     const left = half; // leading overhang (always)
     // A vertical wall meets the right node (x+1,y) if one sits just above/below.
     const right = vSet.has(segKey(x + 1, y)) || vSet.has(segKey(x + 1, y - 1)) ? half : 0;
     return {
-      transform: `translate(${x * cell - left}px, ${y * cell - half}px)`,
+      transform: `translate(${x * cell - left - nudge}px, ${y * cell - half - nudge}px)`,
       width: cell + left + right,
       height: thick,
     };
@@ -205,7 +217,7 @@ function wallStyle(
   const top = half; // leading overhang (always)
   const bottom = hSet.has(segKey(x, y + 1)) || hSet.has(segKey(x - 1, y + 1)) ? half : 0;
   return {
-    transform: `translate(${x * cell - half}px, ${y * cell - top}px)`,
+    transform: `translate(${x * cell - half - nudge}px, ${y * cell - top - nudge}px)`,
     width: thick,
     height: cell + top + bottom,
   };
@@ -303,7 +315,7 @@ const BoardWalls = memo(function BoardWalls({
         <div
           key={`sh-${seg.orient}-${seg.x}-${seg.y}`}
           className="wall-shadow"
-          style={wallStyle(seg, cell, hSet, vSet)}
+          style={wallStyle(seg, cell, hSet, vSet, level.width, level.height)}
         />
       ))}
       {level.gates.map((g) =>
@@ -311,7 +323,7 @@ const BoardWalls = memo(function BoardWalls({
           <div
             key={`gsh-${g.id}`}
             className="wall-shadow"
-            style={wallStyle(gateSeg(g), cell, hSet, vSet)}
+            style={wallStyle(gateSeg(g), cell, hSet, vSet, level.width, level.height)}
           />
         ),
       )}
@@ -319,7 +331,7 @@ const BoardWalls = memo(function BoardWalls({
         <div
           key={`tp-${seg.orient}-${seg.x}-${seg.y}`}
           className="wall-top"
-          style={wallStyle(seg, cell, hSet, vSet)}
+          style={wallStyle(seg, cell, hSet, vSet, level.width, level.height)}
         />
       ))}
       {level.gates.map((g) => {
@@ -329,7 +341,7 @@ const BoardWalls = memo(function BoardWalls({
           <div
             key={`gtp-${g.id}`}
             className={`wall-top gate-top gate-top--${seg.orient} ${open ? 'gate-top--open' : ''}`}
-            style={wallStyle(seg, cell, hSet, vSet)}
+            style={wallStyle(seg, cell, hSet, vSet, level.width, level.height)}
           />
         );
       })}
@@ -579,7 +591,11 @@ export function Board({
 }: BoardProps) {
   const cell = cellSize;
   // Depth amount scales with the tile so the tilt reads the same at any size.
-  const wallLift = Math.max(4, Math.round(cell * 0.12));
+  // Block height. This is ALSO the amount the lit top face sits up-left of its
+  // base (a prism lit from top-left), so it is exactly how far the top overhangs
+  // the side's bottom line. Lower it to flatten the extrusion; only 0 makes the
+  // two edges flush, and that removes the 3D read entirely.
+  const wallLift = Math.max(3, Math.round(cell * 0.07));
   const boardStyle = {
     '--cell': `${cell}px`,
     '--cols': level.width,
