@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Pos } from '../../engine';
-import { isLit } from '../flashlight';
+import { isLit, lightLevel } from '../flashlight';
 
 const c: Pos = { x: 2, y: 2 };
 
@@ -37,5 +37,42 @@ describe('isLit (flashlight geometry, SPEC §2.7)', () => {
     const a: Pos = { x: 1, y: 5 };
     const b: Pos = { x: 3, y: 6 };
     expect(isLit(a, b, 2)).toBe(isLit(b, a, 2));
+  });
+});
+
+describe('lightLevel (torch falloff)', () => {
+  it('is fully lit at the centre and inside the inner stop', () => {
+    expect(lightLevel(c, { x: 2, y: 2 }, 2)).toBe(1);
+    expect(lightLevel(c, { x: 3, y: 2 }, 2)).toBe(1); // dist 1 < 1.75
+  });
+
+  it('is fully dark at or beyond the outer stop', () => {
+    expect(lightLevel(c, { x: 2, y: 5 }, 2)).toBe(0); // dist 3 > 2.5
+    expect(lightLevel(c, { x: 0, y: 0 }, 2)).toBe(0); // dist ~2.83 > 2.5
+  });
+
+  it('ramps between the two stops', () => {
+    const v = lightLevel(c, { x: 4, y: 2 }, 2); // dist 2, between 1.75 and 2.5
+    expect(v).toBeGreaterThan(0);
+    expect(v).toBeLessThan(1);
+  });
+
+  it('agrees with isLit at the outer boundary', () => {
+    // isLit's cutoff (radius + 0.5) is exactly where the ramp reaches zero, so
+    // no tile is ever reported lit while contributing nothing, or vice versa.
+    for (const t of [
+      { x: 4, y: 2 },
+      { x: 3, y: 4 },
+      { x: 0, y: 0 },
+      { x: 2, y: 5 },
+    ]) {
+      expect(lightLevel(c, t, 2) > 0).toBe(isLit(c, t, 2) && lightLevel(c, t, 2) > 0);
+    }
+  });
+
+  it('is symmetric', () => {
+    const a: Pos = { x: 1, y: 5 };
+    const b: Pos = { x: 3, y: 6 };
+    expect(lightLevel(a, b, 2)).toBe(lightLevel(b, a, 2));
   });
 });

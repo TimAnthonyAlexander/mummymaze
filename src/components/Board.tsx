@@ -11,7 +11,7 @@ import {
   neighbor,
   samePos,
 } from '../engine';
-import { isLit } from '../game/flashlight';
+import { lightLevel } from '../game/flashlight';
 import type { RenderState } from '../game/render';
 import { boardTextures } from '../game/textures';
 import { BoardAnnotations } from './BoardAnnotations';
@@ -519,12 +519,12 @@ function SpawnRisers({
           // the normal monster layer. Applied to the whole turn wrapper (body +
           // 3D head), so both match the mirrored settled sprite.
           const facing = mirrorStyle(faceToward(m.pos, player));
-          // On a dark level the intro must obey the torch exactly like the
-          // settled monster layer does (see the `lit` gate there): an enemy
-          // outside the pool shows only its glowing eyes, never its body. The
-          // riser plane sits at z6, ABOVE the blackout at z5, so without this
-          // the whole cast is revealed in the dark for the length of the intro.
-          const lit = !level.dark || isLit(player, m.pos, level.dark.radius);
+          // On a dark level the intro obeys the torch exactly like the settled
+          // monster layer does: the body is always rendered but faded by the
+          // falloff, and the eyes fade in as its inverse. The riser plane sits
+          // at z6, ABOVE the blackout at z5, so without this the whole cast is
+          // revealed in the dark for the length of the intro.
+          const light = level.dark ? lightLevel(player, m.pos, level.dark.radius) : 1;
           const tileStyle = {
             transform: `translate(${m.pos.x * cell}px, ${m.pos.y * cell}px)`,
             '--rise-depth': `${depth}px`,
@@ -559,18 +559,19 @@ function SpawnRisers({
                     className="spawn-riser__sprite"
                     style={{ transform: `translate(${-nudgeX}px, ${-nudgeY}px)` }}
                   >
-                    {!lit ? (
-                      // Unlit: eyes only. The body subtree is not rendered at
-                      // all (rather than hidden) so SpawnMummyHeadTurn's
-                      // per-frame rAF never runs for an invisible enemy.
-                      <span className="spawn-riser__eyes" style={facing}>
+                    {light < 1 && (
+                      <span className="spawn-riser__eyes" style={{ ...facing, opacity: 1 - light }}>
                         <span className="dark-eyes">
                           <span className="dark-eye" />
                           <span className="dark-eye" />
                         </span>
                       </span>
-                    ) : (
-                      <>
+                    )}
+                    {light > 0 && (
+                      // Fully dark: the body subtree is not rendered at all
+                      // (rather than faded to zero) so SpawnMummyHeadTurn's
+                      // per-frame rAF never runs for an invisible enemy.
+                      <span className="spawn-riser__lit" style={{ opacity: light }}>
                     <span className="sprite__shadow" />
                     <span
                       className={`spawn-riser__turn${isMummy ? '' : turnActive}`}
@@ -603,7 +604,7 @@ function SpawnRisers({
                         </span>
                       )}
                     </span>
-                      </>
+                      </span>
                     )}
                   </span>
                 </span>
@@ -918,18 +919,31 @@ export function Board({
           render.monsters
           .filter((m) => m.alive)
           .map((m) => {
-            const lit = !dark || isLit(render.player, m.pos, dark.radius);
+            // The BODY is always rendered and faded by the torch falloff, so the
+            // darkness hides it instead of a different sprite replacing it —
+            // walking into the pool reveals the actual enemy rather than
+            // swapping eyes for a body. The eyes are the inverse: the tell in
+            // the dark, switched off once you can see the thing itself.
+            const light = dark ? lightLevel(render.player, m.pos, dark.radius) : 1;
             const facing = mirrorStyle(faceToward(m.pos, render.player));
             const fxClass = m.fx ? ` fx-${m.fx}` : '';
             return (
               <div
                 key={m.id}
                 ref={setSpriteEl(m.id)}
-                className={`sprite sprite--monster${lit ? '' : ' sprite--eyes'}`}
+                className="sprite sprite--monster"
                 style={charStyle(m.pos, cell)}
               >
-                {lit ? (
-                  <span className={`sprite__fx${fxClass}`}>
+                {light < 1 && (
+                  <span className="sprite__eyes" style={{ opacity: 1 - light }}>
+                    <span className="dark-eyes" style={facing}>
+                      <span className="dark-eye" />
+                      <span className="dark-eye" />
+                    </span>
+                  </span>
+                )}
+                {light > 0 && (
+                  <span className={`sprite__fx${fxClass}`} style={{ opacity: light }}>
                     <span className="sprite__shadow" />
                     {isMummyKind(m.kind) ? (
                       <span
@@ -948,11 +962,6 @@ export function Board({
                         <MonsterSprite kind={m.kind} size={charSize} />
                       </span>
                     )}
-                  </span>
-                ) : (
-                  <span className="dark-eyes" style={facing}>
-                    <span className="dark-eye" />
-                    <span className="dark-eye" />
                   </span>
                 )}
               </div>

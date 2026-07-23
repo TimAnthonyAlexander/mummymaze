@@ -688,14 +688,18 @@
   position: absolute;
   inset: 0;
 }
-/* An unlit enemy during the spawn intro on a dark level: eyes only, centred in
-   the tile the way `.sprite--eyes` centres them on the settled monster layer
-   (`.spawn-riser__sprite` is a bare inset:0 box and does not centre). */
-.spawn-riser__eyes {
+/* A dark-level enemy during the spawn intro. `.spawn-riser__sprite` is a bare
+   inset:0 box and does not centre, so both planes get their own centring: the
+   eyes (faded in by the torch falloff) and the lit body beneath them. */
+.spawn-riser__eyes,
+.spawn-riser__lit {
   position: absolute;
   inset: 0;
+}
+.spawn-riser__eyes {
   display: grid;
   place-items: center;
+  z-index: 1;
 }
 
 /* Hide the flat body-SVG head during the turn — the 3D head replaces it. */
@@ -997,11 +1001,19 @@
   }
 }
 
-/* A monster hidden in the dark: no body, no shadow — just a faint pair of
-   glowing eyes so the threat is sensed and roughly located, not handed over. */
-.sprite--eyes {
+/* A monster out in the dark. The body is ALWAYS rendered (faded by the torch
+   falloff — see lightLevel in game/flashlight.ts) so the darkness hides it,
+   rather than a different sprite standing in for it. Over the top, this plane
+   fades the glowing eyes IN as the body fades out, so the threat is sensed and
+   roughly located in the black and the eyes switch off once the pool actually
+   reaches the enemy. Above the body (z1) so they read through it mid-fade. */
+.sprite__eyes {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
+  z-index: 1;
+  pointer-events: none;
 }
 .dark-eyes {
   display: flex;
