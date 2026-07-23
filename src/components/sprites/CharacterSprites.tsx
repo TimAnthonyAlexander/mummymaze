@@ -340,62 +340,227 @@ export const SpawnHead3D = memo(function SpawnHead3D({
   );
 });
 
-/** Scorpion — the slower pursuer. variant 'white' or 'red'. Drawn TOP-DOWN. */
+/**
+ * Scorpion palette. One ramp per variant, darkest → lightest, so the same
+ * artwork reads as the amber (white) or the red monster. Keys are shared with
+ * the drawing below; nothing else in the sprite hardcodes a colour.
+ */
+const SCORPION_PALETTE = {
+  white: {
+    ink: '#0D0804',
+    shadow: '#1C1008',
+    speck: '#3F2209',
+    legMid: '#6E3F12',
+    bodyMid: '#8E5419',
+    limb: '#96591C',
+    legLite: '#A8641F',
+    bodyLite: '#B0702A',
+    hi: '#BE7C2C',
+    clawMid: '#C4832F',
+    plate: '#CF9040',
+    clawHi: '#DDA155',
+  },
+  red: {
+    ink: '#0F0402',
+    shadow: '#1F0B07',
+    speck: '#45170F',
+    legMid: '#7C2E1B',
+    bodyMid: '#9C3C22',
+    limb: '#A54126',
+    legLite: '#B94D2C',
+    bodyLite: '#C15733',
+    hi: '#CC6238',
+    clawMid: '#D06A3D',
+    plate: '#DA7A4A',
+    clawHi: '#E28C5F',
+  },
+} as const;
+
+/** The eight walking legs: [full jointed limb, the lit inner segment]. */
+const SCORPION_LEGS: ReadonlyArray<readonly [string, string]> = [
+  ['M 302 336 L 248 370 L 198 358 L 172 376', 'M 302 336 L 260 362'],
+  ['M 296 306 L 232 320 L 180 298 L 152 304', 'M 296 306 L 246 316'],
+  ['M 294 276 L 232 262 L 184 230 L 156 224', 'M 294 276 L 246 265'],
+  ['M 298 246 L 242 214 L 204 172 L 182 154', 'M 298 246 L 254 221'],
+  ['M 378 336 L 432 370 L 482 358 L 508 376', 'M 378 336 L 420 362'],
+  ['M 384 306 L 448 320 L 500 298 L 528 304', 'M 384 306 L 434 316'],
+  ['M 386 276 L 448 262 L 496 230 L 524 224', 'M 386 276 L 434 265'],
+  ['M 382 246 L 438 214 L 476 172 L 498 154', 'M 382 246 L 426 221'],
+];
+
+/**
+ * Square frame, deliberately NOT centred on the art's bounding box: the extra
+ * headroom above the tail pushes the creature DOWN the tile so its body — not
+ * its face — sits over the board's contact shadow. `.sprite--scorpion` in
+ * Board.css raises that shadow from the biped foot line to meet the body here.
+ */
+const SCORPION_VIEWBOX = '68 25 545 545';
+
+/** Speckle on the mesosoma plates — flat carved dots, not a texture. */
+const SCORPION_SPECKS: ReadonlyArray<readonly [number, number]> = [
+  [322, 300],
+  [358, 298],
+  [338, 270],
+  [314, 242],
+  [364, 244],
+  [330, 214],
+  [354, 188],
+];
+
+/**
+ * Scorpion — the slower pursuer. variant 'white' (amber) or 'red'.
+ * Drawn TOP-DOWN, head/pincers pointing DOWN-screen, tail curled up over the
+ * back. Chunky banded plates, baked top-light, no real-time shading — the same
+ * pre-render read as the rest of the cast. Carries NO baked ground shadow: the
+ * board draws a separate `.sprite__shadow` beneath it.
+ */
 export function ScorpionSprite({
   size = 48,
   className,
   variant = 'white',
 }: SpriteProps & { variant?: 'white' | 'red' }) {
-  const isRed = variant === 'red';
-  const base = isRed ? '#b04e34' : '#b28c46';
-  const light = isRed ? '#c86e51' : '#cba766';
-  const shade = isRed ? '#742e1d' : '#7c5f2c';
-  const dark = isRed ? '#4a241a' : '#4a3a1e';
-  const gid = `scorp-body-${variant}`;
+  const c = SCORPION_PALETTE[variant];
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" fill="none" className={className} aria-label={`${variant} scorpion`}>
-      <defs>
-        <linearGradient id={gid} x1="0.15" y1="0.1" x2="0.85" y2="0.9">
-          <stop offset="0%" stopColor={light} />
-          <stop offset="52%" stopColor={base} />
-          <stop offset="100%" stopColor={shade} />
-        </linearGradient>
-      </defs>
+    <svg
+      width={size}
+      height={size}
+      viewBox={SCORPION_VIEWBOX}
+      fill="none"
+      className={className}
+      aria-label={`${variant} scorpion`}
+    >
+      {/* ── eight walking legs: dark casing, mid limb, lit inner segment ── */}
+      {SCORPION_LEGS.map(([limb, lit]) => (
+        <g key={limb}>
+          <path d={limb} fill="none" stroke={c.ink} strokeWidth="13" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={limb} fill="none" stroke={c.legMid} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={lit} fill="none" stroke={c.legLite} strokeWidth="4" strokeLinecap="round" />
+        </g>
+      ))}
 
-      {/* ── eight walking legs, jointed, splayed to the sides ── */}
-      <g stroke={dark} strokeWidth="1.8" strokeLinecap="round" fill="none">
-        <path d="M27 38 Q19 34 14 37 M27 42 Q18 41 13 45 M28 46 Q19 47 15 52 M29 50 Q22 53 18 58" />
-        <path d="M37 38 Q45 34 50 37 M37 42 Q46 41 51 45 M36 46 Q45 47 49 52 M35 50 Q42 53 46 58" />
+      {/* ── left pedipalp: two arm segments into a heavy pincer ── */}
+      <g transform="rotate(-14 220 460)">
+        <path d="M 310 342 L 272 384" fill="none" stroke={c.ink} strokeWidth="26" strokeLinecap="round" />
+        <path d="M 310 342 L 272 384" fill="none" stroke={c.bodyMid} strokeWidth="19" strokeLinecap="round" />
+        <path d="M 306 348 L 280 376" fill="none" stroke={c.hi} strokeWidth="7" strokeLinecap="round" />
+        <path d="M 272 384 L 242 410" fill="none" stroke={c.ink} strokeWidth="28" strokeLinecap="round" />
+        <path d="M 272 384 L 242 410" fill="none" stroke={c.limb} strokeWidth="21" strokeLinecap="round" />
+        <path d="M 268 390 L 248 406" fill="none" stroke={c.hi} strokeWidth="7" strokeLinecap="round" />
+        <path
+          d="M 240 412 C 260 416 266 434 261 452 C 256 472 242 482 224 480 C 220 502 218 528 216 556 C 207 528 198 500 188 474 C 174 468 169 448 174 430 C 181 410 208 403 240 412 Z"
+          fill={c.limb}
+          stroke={c.ink}
+          strokeWidth="2.5"
+        />
+        <path d="M 234 420 C 248 425 250 440 245 451 C 238 462 222 464 211 455 C 200 444 205 424 218 418 C 223 416 229 418 234 420 Z" fill={c.clawMid} />
+        <path d="M 228 425 C 236 428 237 437 232 442 C 226 448 217 444 215 438 C 214 431 220 423 228 425 Z" fill={c.clawHi} />
+        <path d="M 200 476 C 208 500 213 528 218 554 C 213 528 206 500 196 476 Z" fill={c.speck} opacity="0.7" />
+        <path d="M 224 480 C 246 489 259 514 253 542 C 250 552 242 554 238 546 C 244 518 237 497 222 482 Z" fill={c.legMid} stroke={c.ink} strokeWidth="2.5" />
+        <path d="M 229 488 C 244 500 250 518 247 536" fill="none" stroke={c.legLite} strokeWidth="4" strokeLinecap="round" />
+        <path d="M 211 490 Q 222 494 231 503 M 213 508 Q 224 512 233 521" fill="none" stroke={c.ink} strokeWidth="1.6" opacity="0.6" />
       </g>
 
-      {/* ── abdomen (rear, up) then carapace (front, down) ── */}
-      <path d="M32 24 Q41 26 41 34 Q41 43 32 46 Q23 43 23 34 Q23 26 32 24 Z" fill={`url(#${gid})`} />
-      <ellipse cx="32" cy="47" rx="8" ry="6.2" fill={`url(#${gid})`} />
-      {/* segment ridges + a lit top-left sheen */}
-      <g stroke={shade} strokeWidth="1.3" fill="none" strokeLinecap="round" opacity="0.7">
-        <path d="M24 30 Q32 33 40 30 M24 35 Q32 38 40 35 M25 40 Q32 43 39 40" />
+      {/* ── right pedipalp (mirrored) ── */}
+      <g transform="rotate(14 460 460)">
+        <path d="M 370 342 L 408 384" fill="none" stroke={c.ink} strokeWidth="26" strokeLinecap="round" />
+        <path d="M 370 342 L 408 384" fill="none" stroke={c.bodyMid} strokeWidth="19" strokeLinecap="round" />
+        <path d="M 374 348 L 400 376" fill="none" stroke={c.hi} strokeWidth="7" strokeLinecap="round" />
+        <path d="M 408 384 L 438 410" fill="none" stroke={c.ink} strokeWidth="28" strokeLinecap="round" />
+        <path d="M 408 384 L 438 410" fill="none" stroke={c.limb} strokeWidth="21" strokeLinecap="round" />
+        <path d="M 412 390 L 432 406" fill="none" stroke={c.hi} strokeWidth="7" strokeLinecap="round" />
+        <path
+          d="M 440 412 C 420 416 414 434 419 452 C 424 472 438 482 456 480 C 460 502 462 528 464 556 C 473 528 482 500 492 474 C 506 468 511 448 506 430 C 499 410 472 403 440 412 Z"
+          fill={c.limb}
+          stroke={c.ink}
+          strokeWidth="2.5"
+        />
+        <path d="M 446 420 C 432 425 430 440 435 451 C 442 462 458 464 469 455 C 480 444 475 424 462 418 C 457 416 451 418 446 420 Z" fill={c.clawMid} />
+        <path d="M 452 425 C 444 428 443 437 448 442 C 454 448 463 444 465 438 C 466 431 460 423 452 425 Z" fill={c.clawHi} />
+        <path d="M 480 476 C 472 500 467 528 462 554 C 467 528 474 500 484 476 Z" fill={c.speck} opacity="0.7" />
+        <path d="M 456 480 C 434 489 421 514 427 542 C 430 552 438 554 442 546 C 436 518 443 497 458 482 Z" fill={c.legMid} stroke={c.ink} strokeWidth="2.5" />
+        <path d="M 451 488 C 436 500 430 518 433 536" fill="none" stroke={c.legLite} strokeWidth="4" strokeLinecap="round" />
+        <path d="M 469 490 Q 458 494 449 503 M 467 508 Q 456 512 447 521" fill="none" stroke={c.ink} strokeWidth="1.6" opacity="0.6" />
       </g>
-      <path d="M27 27 Q24 31 25 37" stroke={light} strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.8" />
 
-      {/* ── pedipalp claws reaching forward toward the prey ── */}
-      <g>
-        <path d="M28 49 L23 55" stroke={base} strokeWidth="3.2" strokeLinecap="round" />
-        <path d="M22 52 Q17 54 17 59 Q17 62 20 61 Q19 58 22 57 Q20 55 24 55 Q22 53 22 52 Z" fill={base} stroke={dark} strokeWidth="0.9" strokeLinejoin="round" />
-        <path d="M36 49 L41 55" stroke={shade} strokeWidth="3.2" strokeLinecap="round" />
-        <path d="M42 52 Q47 54 47 59 Q47 62 44 61 Q45 58 42 57 Q44 55 40 55 Q42 53 42 52 Z" fill={shade} stroke={dark} strokeWidth="0.9" strokeLinejoin="round" />
+      {/* ── cephalothorax: front plate, median eyes, lateral eyes, mouthparts ── */}
+      <path d="M 296 386 Q 340 404 384 386 L 390 318 Q 340 300 290 318 Z" fill={c.bodyMid} stroke={c.ink} strokeWidth="2.5" />
+      <path d="M 302 378 Q 340 392 378 378 L 382 330 Q 340 316 298 330 Z" fill={c.bodyLite} />
+      <path d="M 296 386 Q 340 404 384 386 L 385 376 Q 340 393 295 376 Z" fill={c.shadow} />
+      <ellipse cx="340" cy="352" rx="16" ry="11" fill={c.plate} />
+      <circle cx="334" cy="352" r="3" fill="#080503" />
+      <circle cx="346" cy="352" r="3" fill="#080503" />
+      <circle cx="305" cy="332" r="1.8" fill="#080503" />
+      <circle cx="311" cy="339" r="1.6" fill="#080503" />
+      <circle cx="375" cy="332" r="1.8" fill="#080503" />
+      <circle cx="369" cy="339" r="1.6" fill="#080503" />
+      <path d="M 324 386 Q 332 376 340 376 Q 348 376 356 386 Z" fill={c.shadow} stroke={c.ink} strokeWidth="1.5" />
+
+      {/* ── mesosoma: seven banded plates, each lit on top and shadowed at the seam ── */}
+      <path d="M 290 318 Q 340 300 390 318 L 394 288 Q 340 268 286 288 Z" fill={c.bodyMid} stroke={c.ink} strokeWidth="2.5" />
+      <path d="M 296 312 Q 340 296 384 312 L 386 294 Q 340 278 294 294 Z" fill={c.bodyLite} />
+      <path d="M 290 318 Q 340 300 390 318 L 391 309 Q 340 291 289 309 Z" fill={c.shadow} />
+      <path d="M 286 288 Q 340 268 394 288 L 396 258 Q 340 238 284 258 Z" fill={c.bodyMid} stroke={c.ink} strokeWidth="2.5" />
+      <path d="M 292 282 Q 340 264 388 282 L 389 264 Q 340 248 291 264 Z" fill={c.bodyLite} />
+      <path d="M 286 288 Q 340 268 394 288 L 395 279 Q 340 259 285 279 Z" fill={c.shadow} />
+      <path d="M 284 258 Q 340 238 396 258 L 394 228 Q 340 210 286 228 Z" fill={c.bodyMid} stroke={c.ink} strokeWidth="2.5" />
+      <path d="M 290 252 Q 340 234 390 252 L 390 234 Q 340 219 290 234 Z" fill={c.bodyLite} />
+      <path d="M 284 258 Q 340 238 396 258 L 396 249 Q 340 229 283 249 Z" fill={c.shadow} />
+      <path d="M 286 228 Q 340 210 394 228 L 390 198 Q 340 182 290 198 Z" fill={c.bodyMid} stroke={c.ink} strokeWidth="2.5" />
+      <path d="M 292 222 Q 340 206 388 222 L 387 205 Q 340 191 293 205 Z" fill={c.bodyLite} />
+      <path d="M 286 228 Q 340 210 394 228 L 394 219 Q 340 201 285 219 Z" fill={c.shadow} />
+      <path d="M 290 198 Q 340 182 390 198 L 384 170 Q 340 156 296 170 Z" fill={c.bodyMid} stroke={c.ink} strokeWidth="2.5" />
+      <path d="M 296 193 Q 340 179 384 193 L 382 177 Q 340 164 298 177 Z" fill={c.bodyLite} />
+      <path d="M 290 198 Q 340 182 390 198 L 389 189 Q 340 173 289 189 Z" fill={c.shadow} />
+      <path d="M 296 170 Q 340 156 384 170 L 374 144 Q 340 132 306 144 Z" fill={c.bodyMid} stroke={c.ink} strokeWidth="2.5" />
+      <path d="M 302 165 Q 340 153 378 165 L 375 150 Q 340 139 305 150 Z" fill={c.bodyLite} />
+      <path d="M 296 170 Q 340 156 384 170 L 382 161 Q 340 147 295 161 Z" fill={c.shadow} />
+      <path d="M 306 144 Q 340 132 374 144 L 364 122 Q 340 114 316 122 Z" fill={c.bodyMid} stroke={c.ink} strokeWidth="2.5" />
+      <path d="M 311 140 Q 340 130 369 140 L 366 127 Q 340 119 314 127 Z" fill={c.bodyLite} />
+      <path d="M 306 144 Q 340 132 374 144 L 372 136 Q 340 124 305 136 Z" fill={c.shadow} />
+
+      {SCORPION_SPECKS.map(([cx, cy]) => (
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="1.5" fill={c.speck} opacity="0.7" />
+      ))}
+
+      {/* ── metasoma: the tail arcing up over the back, five beads to the telson ── */}
+      <path
+        d="M 340 120 Q 374 96 410 96 Q 448 100 462 134 Q 472 164 468 200 L 462 232"
+        fill="none"
+        stroke={c.ink}
+        strokeWidth="7"
+        opacity="0.45"
+        strokeLinecap="round"
+      />
+      <g transform="rotate(-28 370 110)">
+        <ellipse cx="370" cy="110" rx="25" ry="19" fill={c.limb} stroke={c.ink} strokeWidth="2.5" />
+        <ellipse cx="368" cy="105" rx="16" ry="10" fill={c.hi} />
+        <path d="M 348 116 Q 370 126 392 116 L 392 110 Q 370 120 348 110 Z" fill={c.shadow} />
+      </g>
+      <g transform="rotate(-4 410 104)">
+        <ellipse cx="410" cy="104" rx="24" ry="18" fill={c.limb} stroke={c.ink} strokeWidth="2.5" />
+        <ellipse cx="409" cy="99" rx="15" ry="9" fill={c.hi} />
+        <path d="M 389 110 Q 410 120 431 110 L 431 104 Q 410 114 389 104 Z" fill={c.shadow} />
+      </g>
+      <g transform="rotate(28 444 124)">
+        <ellipse cx="444" cy="124" rx="22" ry="17" fill={c.limb} stroke={c.ink} strokeWidth="2.5" />
+        <ellipse cx="443" cy="119" rx="14" ry="8" fill={c.hi} />
+        <path d="M 426 130 Q 444 139 462 130 L 462 124 Q 444 133 426 124 Z" fill={c.shadow} />
+      </g>
+      <g transform="rotate(58 462 160)">
+        <ellipse cx="462" cy="160" rx="21" ry="16" fill={c.limb} stroke={c.ink} strokeWidth="2.5" />
+        <ellipse cx="461" cy="155" rx="13" ry="8" fill={c.hi} />
+        <path d="M 445 166 Q 462 174 479 166 L 479 160 Q 462 168 445 160 Z" fill={c.shadow} />
+      </g>
+      <g transform="rotate(80 468 196)">
+        <ellipse cx="468" cy="196" rx="20" ry="15" fill={c.limb} stroke={c.ink} strokeWidth="2.5" />
+        <ellipse cx="467" cy="191" rx="12" ry="7" fill={c.hi} />
+        <path d="M 452 202 Q 468 209 484 202 L 484 196 Q 468 203 452 196 Z" fill={c.shadow} />
       </g>
 
-      {/* ── tail (metasoma) arcing up and curling over the back to the stinger ── */}
-      <path d="M32 26 Q26 16 32 11 Q40 7 44 14" fill="none" stroke={base} strokeWidth="5" strokeLinecap="round" />
-      <path d="M44 14 Q47 18 43 22" fill="none" stroke={shade} strokeWidth="4" strokeLinecap="round" />
-      <g stroke={dark} strokeWidth="0.9" opacity="0.6" strokeLinecap="round">
-        <path d="M29 21 L34 20 M28 15 L33 15 M34 11 L37 13 M41 11 L44 13" />
-      </g>
-      <path d="M43 22 Q47 24 45 28 L40 24 Z" fill={shade} stroke={dark} strokeWidth="0.9" strokeLinejoin="round" />
-
-      {/* ── two eyes on the carapace ── */}
-      <circle cx="30" cy="46" r="1.3" fill="#22160b" />
-      <circle cx="34" cy="46" r="1.3" fill="#22160b" />
+      {/* ── telson + the barb hooking forward over the body ── */}
+      <path d="M 462 230 C 476 244 476 264 460 274 C 444 282 428 272 426 256 C 424 240 438 226 452 226 Z" fill={c.legLite} stroke={c.ink} strokeWidth="2.5" />
+      <ellipse cx="450" cy="243" rx="10" ry="7" fill={c.plate} />
+      <path d="M 428 268 C 414 284 400 298 384 310 C 396 294 410 278 422 262 Z" fill={c.shadow} stroke={c.ink} strokeWidth="1.5" />
     </svg>
   );
 }

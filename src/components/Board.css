@@ -221,10 +221,14 @@
   --sprite-shadow-dy: 0px;
   position: absolute;
   left: 50%;
-  /* Vertically centred on ~78% down the tile (where the FEET are, close to
-     .player-oval-ring), then offset by --sprite-shadow-dy. With a 22% height the
-     pool ends at 89% — inside the 92.5% where a south wall starts. */
-  top: calc(78% - (22% * var(--sprite-shadow-scale)) / 2);
+  /* Where down the tile the pool CENTRES. 78% is the biped foot line (close to
+     .player-oval-ring). A top-down character (the scorpion) has no feet down
+     there and overrides this so the pool lands under its body — see
+     .sprite--scorpion. Keep the pool's bottom edge (centre + height/2) inside
+     92.5%, where a south wall starts. */
+  --sprite-shadow-center: 78%;
+  /* Centred on --sprite-shadow-center, then offset by --sprite-shadow-dy. */
+  top: calc(var(--sprite-shadow-center) - (22% * var(--sprite-shadow-scale)) / 2);
   width: calc(62% * var(--sprite-shadow-scale));
   height: calc(22% * var(--sprite-shadow-scale));
   transform: translate(calc(-50% + var(--sprite-shadow-dx)), var(--sprite-shadow-dy));
@@ -249,6 +253,16 @@
     );
   z-index: 0;
   pointer-events: none;
+}
+
+/* The scorpion is drawn TOP-DOWN and sits high in its tile, so the biped foot
+   line (78%) would pool the shadow in front of its face, under nothing. Pull the
+   pool up under its body core and tighten it — the shadow of a low, narrow bug,
+   not of a standing man. */
+.sprite--scorpion .sprite__shadow,
+.spawn-riser__sprite--scorpion .sprite__shadow {
+  --sprite-shadow-center: 61.5%;
+  --sprite-shadow-scale: 0.72;
 }
 
 /* The character art, above its shadow. Only this layer mirrors to face a target. */

@@ -556,7 +556,7 @@ function SpawnRisers({
               <div className="spawn-riser-enemy" style={enemyStyle} aria-hidden="true">
                 <span className={`spawn-riser__lift${liftClass}`}>
                   <span
-                    className="spawn-riser__sprite"
+                    className={`spawn-riser__sprite${isMummy ? '' : ' spawn-riser__sprite--scorpion'}`}
                     style={{ transform: `translate(${-nudgeX}px, ${-nudgeY}px)` }}
                   >
                     {eyeLevel(light) > 0 && (
@@ -931,7 +931,7 @@ export function Board({
               <div
                 key={m.id}
                 ref={setSpriteEl(m.id)}
-                className="sprite sprite--monster"
+                className={`sprite sprite--monster${isMummyKind(m.kind) ? '' : ' sprite--scorpion'}`}
                 style={charStyle(m.pos, cell)}
               >
                 {eyeLevel(light) > 0 && (
