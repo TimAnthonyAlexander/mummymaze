@@ -542,19 +542,24 @@
   overflow: hidden;
   border-radius: 1px;
 }
-/* The dark recess the portcullis stands in / retracts into — always visible, so
-   an open gate reads as a slot cut in the floor, not a gap. */
+/* The dark recess the portcullis stands in / retracts into. Visible while the
+   gate is closed (it backs the gaps between bars) and while it lowers (the bars
+   sink into darkness) — then it fades to nothing so an OPEN gate is clean floor,
+   never a permanent dark rectangle stamped on the board. The fade is delayed so
+   the recess is still there for most of the descent. */
 .gate__groove {
   position: absolute;
   inset: 0;
-  /* A warm dark-stone recess (a channel cut in the tomb floor), not a black void:
-     top lip in shadow, warming toward a faintly lit floor at the bottom of the
-     slot so an open gate reads as a shallow groove the portcullis dropped into. */
   background: linear-gradient(180deg, #241a0e 0%, #17100a 45%, #100b06 78%, #2a1f12 100%);
   box-shadow:
     inset 0 3px 5px rgba(0, 0, 0, 0.66),
     inset 0 -1px 0 rgba(120, 92, 52, 0.35),
     inset 0 0 0 1px rgba(10, 7, 3, 0.9);
+  opacity: 1;
+  transition: opacity 300ms ease-out 480ms;
+}
+.gate--open .gate__groove {
+  opacity: 0;
 }
 /* The moving grille. translateY(0) = raised/closed; translateY(105%) = fully
    lowered (below the slot window, clipped away). One transform, so both a short
@@ -615,7 +620,8 @@
     );
 }
 /* A dark stone jamb framing the slot, so the portcullis reads as set into the
-   masonry. Static — stays put while the grille moves. */
+   masonry. Fades out with the recess when the gate opens, so nothing outlines a
+   rectangle on the bare floor once the gate is gone. */
 .gate__frame {
   position: absolute;
   inset: 0;
@@ -623,16 +629,25 @@
   box-shadow:
     inset 0 0 0 1px rgba(20, 14, 6, 0.92),
     inset 0 0 5px rgba(0, 0, 0, 0.42);
+  opacity: 1;
+  transition: opacity 300ms ease-out 480ms;
+}
+.gate--open .gate__frame {
+  opacity: 0;
 }
 /* Animations off (in-app toggle) or the OS reduced-motion request: the gate must
    SNAP open/closed like the rest of the turn, not play the descend/rise. */
 .board--instant .gate,
-.board--instant .gate__grille {
+.board--instant .gate__grille,
+.board--instant .gate__groove,
+.board--instant .gate__frame {
   transition: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .gate,
-  .gate__grille {
+  .gate__grille,
+  .gate__groove,
+  .gate__frame {
     transition: none;
   }
 }
