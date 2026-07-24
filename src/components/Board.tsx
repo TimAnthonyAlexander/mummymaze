@@ -14,6 +14,7 @@ import {
 import { eyeLevel, lightLevel } from '../game/flashlight';
 import type { RenderState } from '../game/render';
 import { boardTextures } from '../game/textures';
+import { useSettings } from '../game/useSettings';
 import { BoardAnnotations } from './BoardAnnotations';
 import {
   ExplorerSprite,
@@ -246,6 +247,66 @@ function gateSeg(g: { a: Pos; dir: Dir }): WallSeg {
   }
 }
 
+/** The gate's slot depth as a fraction of a cell — how tall the portcullis stands
+ *  (and how far it sinks into the floor). Wider than a wall so it reads as its own
+ *  metal object set in the boundary, not a stone slab. */
+const GATE_BAND = 0.42;
+
+/**
+ * The gate's on-board box: a band centred on the boundary line, one cell long and
+ * `GATE_BAND` cells deep. Centred exactly where the wall two-plane system puts a
+ * slab's centre (the same interior up-left nudge), so a closed gate lines up with
+ * any wall it butts into. The grille inside is clipped to this band, so opening
+ * lowers it straight down out of view (see Board.css).
+ */
+function gateSlotStyle(seg: WallSeg, cell: number, cols: number, rows: number): CSSProperties {
+  const band = cell * GATE_BAND;
+  const onPerimeter =
+    seg.orient === 'h' ? seg.y === 0 || seg.y === rows : seg.x === 0 || seg.x === cols;
+  const nudge = onPerimeter ? 0 : INNER_WALL_NUDGE;
+  const cx = seg.x * cell - nudge;
+  const cy = seg.y * cell - nudge;
+  if (seg.orient === 'h') {
+    return { transform: `translate(${cx}px, ${cy - band / 2}px)`, width: cell, height: band };
+  }
+  return { transform: `translate(${cx - band / 2}px, ${cy}px)`, width: band, height: cell };
+}
+
+/**
+ * One gate: a metal portcullis standing in a dark floor slot. The grille (bars +
+ * two cross-rails, lit top-left) fills the slot when closed and, when `open`,
+ * lowers straight down into the slot — clipped by the slot window — leaving the
+ * empty groove. Closing raises it back. All of it is CSS-driven off the `open`
+ * class so the descend/rise animates without React re-rendering mid-transition.
+ */
+function GateFigure({
+  seg,
+  open,
+  cell,
+  cols,
+  rows,
+}: {
+  seg: WallSeg;
+  open: boolean;
+  cell: number;
+  cols: number;
+  rows: number;
+}) {
+  return (
+    <div
+      className={`gate gate--${seg.orient}${open ? ' gate--open' : ''}`}
+      style={gateSlotStyle(seg, cell, cols, rows)}
+      aria-hidden="true"
+    >
+      <div className="gate__window">
+        <div className="gate__groove" />
+        <div className="gate__grille" />
+      </div>
+      <div className="gate__frame" />
+    </div>
+  );
+}
+
 /**
  * Static floor grid: the textured checker cells plus any trap/key decals. Depends
  * only on the level + cell size, so it is memoized and does NOT re-render while a
@@ -347,15 +408,6 @@ const BoardWalls = memo(function BoardWalls({
       {jambs.map((style, i) => (
         <div key={`jsh-${i}`} className="wall-shadow" style={style} />
       ))}
-      {level.gates.map((g) =>
-        gatesOpen[g.id] ? null : (
-          <div
-            key={`gsh-${g.id}`}
-            className="wall-shadow"
-            style={wallStyle(gateSeg(g), cell, hSet, vSet, level.width, level.height)}
-          />
-        ),
-      )}
       {walls.map((seg) => (
         <div
           key={`tp-${seg.orient}-${seg.x}-${seg.y}`}
@@ -366,17 +418,18 @@ const BoardWalls = memo(function BoardWalls({
       {jambs.map((style, i) => (
         <div key={`jtp-${i}`} className="wall-top" style={style} />
       ))}
-      {level.gates.map((g) => {
-        const seg = gateSeg(g);
-        const open = gatesOpen[g.id];
-        return (
-          <div
-            key={`gtp-${g.id}`}
-            className={`wall-top gate-top gate-top--${seg.orient} ${open ? 'gate-top--open' : ''}`}
-            style={wallStyle(seg, cell, hSet, vSet, level.width, level.height)}
-          />
-        );
-      })}
+      {/* Gates render last so the metal portcullis sits above the stone tops it is
+          set into, and each is a self-contained animatable object (see GateFigure). */}
+      {level.gates.map((g) => (
+        <GateFigure
+          key={`gate-${g.id}`}
+          seg={gateSeg(g)}
+          open={gatesOpen[g.id]}
+          cell={cell}
+          cols={level.width}
+          rows={level.height}
+        />
+      ))}
     </div>
   );
 });
@@ -723,6 +776,9 @@ export function Board({
   onMove,
 }: BoardProps) {
   const cell = cellSize;
+  // With animations off (or reduced motion), gate open/close must SNAP rather
+  // than play its descend/rise — mirrors how useAnimatedGame snaps the turn.
+  const { animations } = useSettings();
   // Depth amount scales with the tile so the tilt reads the same at any size.
   // Block height. This is ALSO the amount the lit top face sits up-left of its
   // base (a prism lit from top-left), so it is exactly how far the top overhangs
@@ -891,7 +947,7 @@ export function Board({
   }, [render, cell, mummySize]);
 
   return (
-    <div className="board" style={boardStyle}>
+    <div className={`board${animations ? '' : ' board--instant'}`} style={boardStyle}>
       {/* Static floor grid — memoized, so it never re-renders while a turn plays. */}
       <BoardFloor level={level} cell={cell} markerSize={markerSize} />
 

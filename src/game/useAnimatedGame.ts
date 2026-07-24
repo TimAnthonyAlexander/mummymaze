@@ -196,7 +196,10 @@ function buildFrames(
         const b = bucket(lastRound);
         const { gatesOpen } = ev;
         b.applies.push((r) => ({ ...r, gatesOpen }));
-        b.sounds.push(sfx.key);
+        // The iron portcullis grinding into / out of its floor slot. Fires as the
+        // gatesOpen change is applied, so the metal sound and the descend/rise
+        // animation (Board.css) start together.
+        b.sounds.push(sfx.gate);
         break;
       }
       case 'kill': {
@@ -287,7 +290,7 @@ function fireInstantSounds(trace: readonly TraceEvent[]): void {
     else if (ev.kind === 'kill') kill = true;
   }
   if (playerMoved) sfx.step();
-  if (gate) sfx.key();
+  if (gate) sfx.gate();
   if (kill) sfx.merge();
   if (monsterMoved) sfx.monster();
 }

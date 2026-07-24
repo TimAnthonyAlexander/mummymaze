@@ -14,6 +14,7 @@
  */
 import { loadSave, updateSave } from './storage';
 import blockedUrl from '../assets/audio/blocked.mp3';
+import gateUrl from '../assets/audio/gate.mp3';
 import hintUrl from '../assets/audio/hint.mp3';
 import keyUrl from '../assets/audio/key.mp3';
 import loseUrl from '../assets/audio/lose.mp3';
@@ -171,6 +172,7 @@ const SAMPLES = {
   blockedWait: [blockedUrl],
   monster: [monster1, monster2, monster3],
   key: [keyUrl],
+  gate: [gateUrl],
   merge: [mergeUrl],
   win: [winUrl],
   lose: [loseUrl],
@@ -333,8 +335,12 @@ export const sfx = {
   mummyStep: () => play(() => tripleStep(MUMMY_DAM_RATE, MUMMY_DUM_RATE, MUMMY_LOWPASS, 0.54, 0.4)),
   /** The human's step: the SAME triple, but much lighter — high, bright, soft. */
   playerStep: () => play(() => tripleStep(HUMAN_DAM_RATE, HUMAN_DUM_RATE, HUMAN_LOWPASS, 0.34, 0.24)),
-  /** Key pickup / gate toggle: a metal latch. */
+  /** Key pickup: a short metal latch (the key turning in the lock). */
   key: () => play(() => playSample(SAMPLES.key, { gain: 0.6 })),
+  /** A gate toggling: the heavy iron portcullis grinding down into (or up out of)
+   *  its floor slot, seating with a metallic clank. Runs ~1s, tracking the
+   *  descend/rise animation on the board. */
+  gate: () => play(() => playSample(SAMPLES.gate, { gain: 0.7 })),
   /** Monster collision: a heavy soft thud. */
   merge: () => play(() => playSample(SAMPLES.merge, { gain: 0.85 })),
   /** Win: a resonant temple bong. */

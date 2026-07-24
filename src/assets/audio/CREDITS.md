@@ -15,11 +15,18 @@ Sounds* (<https://kenney.nl/assets>).
 License: Creative Commons Zero (CC0 1.0) —
 <https://creativecommons.org/publicdomain/zero/1.0/>
 
+`gate.mp3` is an original mix of three CC0 *RPG Audio* clips: `creak2` (the iron
+grind of the descent, pitched down for weight), `doorClose_3` (the heavy seat as
+the gate bottoms out) and `metalPot2` (a short metallic ring on the clank). Mono,
+44.1 kHz, ~1.08 s, band-limited, peak-normalized to −3 dBFS with a short fade-out.
+Being built only from CC0 sources, the mix is CC0 as well.
+
 | File | Event | Kenney source |
 |------|-------|---------------|
 | `step1-3.mp3` | player hop | `footstep_concrete_00x` (Impact) |
 | `monster1-3.mp3` | monster shuffle | `cloth1-3` (RPG) |
-| `key.mp3` | key / gate toggle | `metalLatch` (RPG) |
+| `key.mp3` | key pickup | `metalLatch` (RPG) |
+| `gate.mp3` | gate open/close | `creak2` + `doorClose_3` + `metalPot2` (RPG), mixed |
 | `merge.mp3` | monster collision | `impactSoft_heavy_000` (Impact) |
 | `win.mp3` | level won | `bong_001` (Interface) |
 | `lose.mp3` | level lost | `impactWood_heavy_000` (Impact) |
