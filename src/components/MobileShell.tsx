@@ -100,16 +100,18 @@ export function MobileShell({
           >
             <Menu />
           </IconButton>
+          {/* The dead-maze tell, mirrored from the desktop sidebar: a gilded ankh
+              that turns blood-red and pulses when no winning move remains OR the
+              player is already dead. Anchored on the LEFT so a long loss message
+              (which widens the status tags) can never push it off the narrow bar. */}
+          <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+            <Ankh size={26} dead={liveUnsolvable} />
+          </Box>
           <Box sx={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
             <AppTitle iconSize={22} variant="subtitle1" />
           </Box>
           <Box sx={{ flexShrink: 0 }}>
             <StatusChips state={state} animating={animating} />
-          </Box>
-          {/* The dead-maze tell, mirrored from the desktop sidebar: a gilded ankh
-              that turns blood-red and pulses when no winning move remains. */}
-          <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-            <Ankh size={26} dead={liveUnsolvable} />
           </Box>
           <Tooltip title="World map">
             <IconButton

@@ -23,9 +23,12 @@ export interface UseHints {
   /** True when the last request found no win from the current state. */
   unsolvable: boolean;
   /**
-   * Live unsolvability flag, recomputed automatically after every move/undo/load
-   * (not just on a button press). Drives the blood-red ankh. Unlike
-   * `unsolvable` (the button-triggered one behind "Show solution") it never
+   * Live "dead maze" flag, recomputed automatically after every move/undo/load
+   * (not just on a button press). Drives the blood-red ankh. True when either the
+   * position is unwinnable (solver finds no win) OR the game is already lost — so
+   * the ankh also fires the instant a fatal move commits (walking into a monster,
+   * or being caught during the monster phase), including while the kill animates.
+   * Unlike `unsolvable` (the button-triggered one behind "Show solution") it never
    * surfaces the solution or a text hint, so it can't spoil the puzzle.
    */
   liveUnsolvable: boolean;
@@ -54,13 +57,19 @@ export function useHints(state: GameState): UseHints {
     setUnsolvable(false);
   }, [state]);
 
-  // Live unsolvability detection: run the exact solver from the current position
+  // Live "dead maze" detection: run the exact solver from the current position
   // after every state change so the ankh turns red the instant the maze becomes
-  // unwinnable — no button press required. Only meaningful while it's the
-  // player's turn; a won/lost state is never flagged. Deferred to a timeout so
-  // the BFS never blocks the just-committed move's hop animation, and cancelled
-  // if the state changes again before it finishes.
+  // unwinnable — no button press required. A LOST game is the ultimate dead maze,
+  // flagged instantly (no solver needed) so the ankh fires the moment a fatal move
+  // commits, including the frames while the killing blow animates; a WIN is never
+  // flagged. The player-turn case is deferred to a timeout so the BFS never blocks
+  // the just-committed move's hop animation, and cancelled if the state changes
+  // again before it finishes.
   useEffect(() => {
+    if (state.phase === 'lost') {
+      setLiveUnsolvable(true);
+      return;
+    }
     if (state.phase !== 'player') {
       setLiveUnsolvable(false);
       return;
