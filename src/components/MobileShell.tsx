@@ -11,6 +11,7 @@ import { LevelDrawer } from './LevelDrawer';
 import { AppTitle } from './AppTitle';
 import { StatusChips } from './StatusChips';
 import { SettingsToggles } from './SettingsToggles';
+import { Ankh } from './Ankh';
 import { useSettings } from '../game/useSettings';
 
 interface MobileShellProps {
@@ -28,6 +29,7 @@ interface MobileShellProps {
   hintUsed: boolean;
   solution: Action[] | null;
   unsolvable: boolean;
+  liveUnsolvable: boolean;
   onSelectLevel: (id: string) => void;
   onResetProgress: () => void;
   onOpenMap: () => void;
@@ -59,6 +61,7 @@ export function MobileShell({
   hintUsed,
   solution,
   unsolvable,
+  liveUnsolvable,
   onSelectLevel,
   onResetProgress,
   onOpenMap,
@@ -102,6 +105,11 @@ export function MobileShell({
           </Box>
           <Box sx={{ flexShrink: 0 }}>
             <StatusChips state={state} animating={animating} />
+          </Box>
+          {/* The dead-maze tell, mirrored from the desktop sidebar: a gilded ankh
+              that turns blood-red and pulses when no winning move remains. */}
+          <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+            <Ankh size={26} dead={liveUnsolvable} />
           </Box>
           <Tooltip title="World map">
             <IconButton
